@@ -1,0 +1,22 @@
+{
+  "name": "twinlife",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n CLIENT,SERVER -c \"cyan.bold,magenta.bold\" \"npm:dev:client\" \"npm:dev:server\"",
+    "dev:client": "npm --prefix client run dev",
+    "dev:server": "npm --prefix server run dev",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "npm --prefix client run build",
+    "build:server": "npm --prefix server run build",
+    "test": "npm --prefix client run test",
+    "lint": "echo 'No root lint step'"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}
