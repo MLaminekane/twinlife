@@ -9,12 +9,16 @@ export function ControlsPanel() {
   const shadows = useStore(s => s.settings.shadows)
   const labels = useStore(s => s.settings.labels)
   const buildings = useStore(s => s.buildings)
+  const people = useStore(s => s.people)
   const environment = useStore(s => s.environment)
   const applyDirective = useStore(s => s.applyDirective)
   const reset = useStore(s => s.reset)
+  const setSelectedPerson = useStore(s => s.setSelectedPerson)
 
   const [prompt, setPrompt] = useState('Augmente l\'activité en Sciences et en Bibliothèque, ralentis un peu la simulation.')
   const [busy, setBusy] = useState(false)
+  const [query, setQuery] = useState('')
+  const [searchMsg, setSearchMsg] = useState<string | null>(null)
 
   return (
     <div className="panel">
@@ -39,6 +43,34 @@ export function ControlsPanel() {
         <label><input type="checkbox" checked={shadows} onChange={(e) => useStore.setState(s => ({ settings: { ...s.settings, shadows: e.target.checked } }))} /> Ombres</label>
         <label><input type="checkbox" checked={labels} onChange={(e) => useStore.setState(s => ({ settings: { ...s.settings, labels: e.target.checked } }))} /> Labels</label>
       </div>
+
+      <div className="separator" />
+      <div className="row"><label>Recherche citoyen</label></div>
+      <div className="row" style={{ gap: 8 }}>
+        <input
+          className="input"
+          type="text"
+          placeholder="Nom ou prénom (ex: Camille, Dubois)"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <button
+          className="btn"
+          onClick={() => {
+            const q = query.trim().toLowerCase()
+            if (!q) { setSearchMsg('Entrez un nom.'); return }
+            const p = people.find(p => p.name.toLowerCase().includes(q))
+            if (p) {
+              setSelectedPerson(p.id)
+              setSearchMsg(`Focalisation sur ${p.name}`)
+            } else {
+              setSearchMsg('Aucun résultat')
+            }
+          }}
+        >🔎 Trouver</button>
+        <button className="btn" onClick={() => { setSelectedPerson(null); setSearchMsg(null); setQuery('') }}>Effacer</button>
+      </div>
+      {searchMsg && <div className="small">{searchMsg}</div>}
 
       <div className="separator" />
       <div className="row"><label>Environnement</label></div>
@@ -97,7 +129,22 @@ export function ControlsPanel() {
       <div className="separator" />
       <div className="row"><label>Bâtiments visibles</label></div>
       <div className="row" style={{ flexWrap: 'wrap' }}>
-        {buildings.map(b => (
+        {buildings.filter(b => !b.id.startsWith('res')).map(b => (
+          <label key={b.id} style={{ width: '48%' }}>
+            <input type="checkbox" checked={useStore.getState().settings.visibleBuildings.has(b.id)} onChange={(e) => {
+              useStore.setState(s => {
+                const set = new Set(s.settings.visibleBuildings)
+                if (e.target.checked) set.add(b.id); else set.delete(b.id)
+                return { settings: { ...s.settings, visibleBuildings: set } }
+              })
+            }} /> {b.name}
+          </label>
+        ))}
+      </div>
+
+      <div className="row"><label>Résidences étudiantes</label></div>
+      <div className="row" style={{ flexWrap: 'wrap' }}>
+        {buildings.filter(b => b.id.startsWith('res') || b.name.toLowerCase().includes('résidence')).map(b => (
           <label key={b.id} style={{ width: '48%' }}>
             <input type="checkbox" checked={useStore.getState().settings.visibleBuildings.has(b.id)} onChange={(e) => {
               useStore.setState(s => {

@@ -5,6 +5,7 @@ import { useRef, useMemo } from 'react'
 import { useStore } from '../state/store'
 import { PeoplePoints } from './PeoplePoints'
 import { PeopleLabels } from './PeopleLabels'
+import { Zones } from './Zones'
 import { ActivityBars } from './ActivityBars'
 import { Roads } from './Roads'
 import { BuildingMesh } from './BuildingMesh'
@@ -25,6 +26,9 @@ export function CampusScene() {
         <planeGeometry args={[80, 80]} />
         <meshStandardMaterial color="#0c121a" />
       </mesh>
+
+      {/* Zone overlays and labels */}
+      <Zones />
 
   {/* Subtle ground grid */}
   <Grid position={[0, 0.002, 0]} args={[80, 80]} cellSize={2} cellThickness={0.4} sectionSize={10} sectionThickness={1} fadeDistance={40} fadeStrength={1} infiniteGrid />

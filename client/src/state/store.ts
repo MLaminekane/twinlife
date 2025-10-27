@@ -69,6 +69,7 @@ export type Store = {
   settings: Settings
   metrics: Metrics
   environment: Environment
+  selectedPersonId: number | null
   effects: Array<
     | { type: 'activityRevert'; buildingId: string; delta: number; remaining: number }
     | { type: 'pause'; remaining: number }
@@ -77,6 +78,7 @@ export type Store = {
   tick: (dt: number) => void
   reset: () => void
   resetRandom: () => void
+  setSelectedPerson: (id: number | null) => void
 }
 
 const initialBuildings: Building[] = [
@@ -87,7 +89,20 @@ const initialBuildings: Building[] = [
   { id: 'art', name: 'Arts', position: [ -12, 2, 7 ], size: [3.5, 3.5, 5], activity: 0.5, occupancy: 0 },
   { id: 'law', name: 'Droit', position: [ 2, 2, -12 ], size: [4.5, 4, 3.5], activity: 0.5, occupancy: 0 },
   { id: 'lib', name: 'Bibliothèque', position: [ -10, 2, -12 ], size: [6, 4, 3], activity: 0.5, occupancy: 0 },
-  { id: 'adm', name: 'Administration', position: [ 12, 2, -2 ], size: [4, 4, 4], activity: 0.5, occupancy: 0 }
+  { id: 'adm', name: 'Administration', position: [ 12, 2, -2 ], size: [4, 4, 4], activity: 0.5, occupancy: 0 },
+  // Résidences étudiantes proches mais séparées du coeur du campus
+  { id: 'res-a', name: 'Résidence A', position: [ -22, 2, 16 ], size: [5, 4, 5], activity: 0.45, occupancy: 0 },
+  { id: 'res-b', name: 'Résidence B', position: [ 22, 2, 16 ], size: [5, 4, 5], activity: 0.45, occupancy: 0 },
+  { id: 'res-c', name: 'Résidence C', position: [ 0, 2, 22 ], size: [5.5, 4, 5], activity: 0.45, occupancy: 0 }
+  ,
+  // Centre-ville (lieux de travail)
+  { id: 'city-tech', name: 'Tour Tech', position: [ -26, 2, -18 ], size: [4.5, 6, 4.5], activity: 0.5, occupancy: 0 },
+  { id: 'city-biz', name: 'Bureaux', position: [ -18, 2, -24 ], size: [5, 5, 5], activity: 0.5, occupancy: 0 },
+  { id: 'city-town', name: 'Mairie', position: [ -30, 2, -26 ], size: [6, 4, 4], activity: 0.5, occupancy: 0 },
+  // Place du Royaume (shopping, restaurants, famille)
+  { id: 'plz-mall', name: 'Centre Commercial', position: [ 26, 2, -18 ], size: [8, 4, 8], activity: 0.5, occupancy: 0 },
+  { id: 'plz-food', name: 'Restaurants', position: [ 18, 2, -24 ], size: [6, 3.5, 6], activity: 0.5, occupancy: 0 },
+  { id: 'plz-park', name: 'Parc', position: [ 30, 2, -28 ], size: [7, 2, 7], activity: 0.4, occupancy: 0 }
 ]
 
 function seededRandom(seed: number) {
@@ -165,8 +180,9 @@ export const useStore = create<Store>((set, get) => ({
     labels: true,
     visibleBuildings: new Set(initialBuildings.map(b => b.id))
   },
-  metrics: { totalPeople: 200, activeBuildings: 8, totalOccupancy: 0 },
+  metrics: { totalPeople: 200, activeBuildings: initialBuildings.length, totalOccupancy: 0 },
   environment: { season: 'automne', dayPeriod: 'apresmidi', weekend: false },
+  selectedPersonId: null,
   effects: [],
 
   applyDirective: (d) => set(state => {
@@ -446,5 +462,6 @@ export const useStore = create<Store>((set, get) => ({
   resetRandom: () => set(state => {
     const bs = state.buildings.map(b => ({ ...b, activity: 0.2 + Math.random()*0.6, occupancy: 0 }))
     return { buildings: bs, people: initPeople(state.people.length, bs) }
-  })
+  }),
+  setSelectedPerson: (id) => set({ selectedPersonId: id })
 }))

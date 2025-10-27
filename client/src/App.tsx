@@ -6,6 +6,8 @@ import { useStore } from './state/store'
 import { CampusScene } from './components/CampusScene'
 import { HUD } from './components/HUD'
 import { ControlsPanel } from './components/ControlsPanel'
+import { FocusCamera } from './components/FocusCamera'
+import { AutoTarget } from './components/AutoTarget'
 
 export default function App() {
   const glow = useStore(s => s.settings.glow)
@@ -28,6 +30,8 @@ export default function App() {
           <CampusScene />
         </Suspense>
         <OrbitControls makeDefault />
+        <FocusCamera />
+  <AutoTarget />
         {glow && (
           <EffectComposer>
             <Bloom intensity={1.2} luminanceThreshold={0.2} luminanceSmoothing={0.9} radius={0.85} />
