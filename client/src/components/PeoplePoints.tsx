@@ -28,7 +28,7 @@ export function PeoplePoints() {
   return (
     <points ref={ref}>
       <bufferGeometry>
-        <bufferAttribute attach="attributes-position" array={positions} itemSize={3} />
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
       </bufferGeometry>
       <pointsMaterial size={0.18} sizeAttenuation color={color} depthWrite={false} transparent opacity={glow ? 0.95 : 0.85} />
     </points>

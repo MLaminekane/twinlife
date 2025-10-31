@@ -32,3 +32,6 @@ input[type="checkbox"] { accent-color: #3b82f6; }
 	.hud { left: 6px; top: 6px; }
 }
 
+/* Mapbox CSS */
+@import url('mapbox-gl/dist/mapbox-gl.css');
+

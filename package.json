@@ -18,5 +18,9 @@
   },
   "devDependencies": {
     "concurrently": "^9.0.1"
+  },
+  "dependencies": {
+    "mapbox-gl": "^3.16.0",
+    "react-map-gl": "^8.1.0"
   }
 }

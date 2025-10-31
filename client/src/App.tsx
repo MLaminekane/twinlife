@@ -1,6 +1,6 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls, SoftShadows, Text } from '@react-three/drei'
-import { EffectComposer, Bloom } from '@react-three/postprocessing'
+import { EffectComposer, Bloom, SMAA, SSAO } from '@react-three/postprocessing'
 import { Suspense } from 'react'
 import { useStore } from './state/store'
 import { CampusScene } from './components/CampusScene'
@@ -8,6 +8,7 @@ import { HUD } from './components/HUD'
 import { ControlsPanel } from './components/ControlsPanel'
 import { FocusCamera } from './components/FocusCamera'
 import { AutoTarget } from './components/AutoTarget'
+import { MapView } from './components/MapView'
 
 export default function App() {
   const glow = useStore(s => s.settings.glow)
@@ -34,11 +35,14 @@ export default function App() {
   <AutoTarget />
         {glow && (
           <EffectComposer>
-            <Bloom intensity={1.2} luminanceThreshold={0.2} luminanceSmoothing={0.9} radius={0.85} />
+            <SMAA />
+            <SSAO intensity={0.3} radius={0.2} luminanceInfluence={0.6} />
+            <Bloom intensity={1.15} luminanceThreshold={0.22} luminanceSmoothing={0.9} radius={0.85} />
           </EffectComposer>
         )}
       </Canvas>
       <HUD />
+      <MapView />
       <ControlsPanel />
     </div>
   )
