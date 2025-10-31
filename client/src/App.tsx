@@ -9,6 +9,8 @@ import { ControlsPanel } from './components/ControlsPanel'
 import { FocusCamera } from './components/FocusCamera'
 import { AutoTarget } from './components/AutoTarget'
 import { MapView } from './components/MapView'
+import { AgentLoop } from './components/AgentLoop'
+import { PersistGate } from './components/PersistGate'
 
 export default function App() {
   const glow = useStore(s => s.settings.glow)
@@ -42,6 +44,8 @@ export default function App() {
         )}
       </Canvas>
       <HUD />
+  <AgentLoop />
+  <PersistGate />
       <MapView />
       <ControlsPanel />
     </div>

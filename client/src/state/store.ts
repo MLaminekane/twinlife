@@ -72,6 +72,9 @@ export type Store = {
   settings: Settings
   metrics: Metrics
   environment: Environment
+  scenario: Scenario
+  timeseries?: TimeSample[]
+  tsAcc?: number
   selectedPersonId: number | null
   hoveredBuildingId: string | null
   effects: Array<
@@ -82,12 +85,15 @@ export type Store = {
   deptInteractions: Array<{ from: string; to: string; type: 'collab'|'rivalry'; remaining: number }>
   deptFlashes: Array<{ buildingId: string; remaining: number }>
   news: NewsItem[]
+  agents: Agent[]
   applyDirective: (d: Directive) => void
   tick: (dt: number) => void
   reset: () => void
   resetRandom: () => void
   setSelectedPerson: (id: number | null) => void
   setHoveredBuilding: (id: string | null) => void
+  setScenario: (s: Partial<Scenario>) => void
+  applyAgentActions: (acts: AgentAction[]) => void
 }
 
 export type Department = {
@@ -105,6 +111,27 @@ export type NewsItem = {
   kind: 'pub'|'collab'|'rivalry'|'people'|'building'|'activity'|'system'
   text: string
 }
+
+export type TimeSample = { ts: number; ai: number; hum: number; pubs: number; collabs: number; rivalries: number }
+
+export type AgentRole = 'prof'|'student'|'rector'
+export type Agent = {
+  id: string
+  role: AgentRole
+  dept?: 'eco'|'bio'|'eng'|'art'|'law'|'med'|'lib'|'adm'
+  buildingId?: string
+  biases: { research: number; collab: number; rivalry: number; ai: number; humanities: number }
+  memory?: string[]
+  h?: number
+}
+
+export type Scenario = {
+  investmentAI: number // 0..1
+  investmentHumanities: number // 0..1
+  llmAgents: boolean
+}
+
+export type AgentAction = { id: string; publish?: boolean; seekCollabWith?: string|null; challenge?: string|null; moveTo?: string|null; message?: string; setInvestments?: { ai: number; humanities: number } }
 
 const initialBuildings: Building[] = [
   { id: 'sci', name: 'Sciences', position: [ -8, 2, -4 ], size: [4, 4, 6], activity: 0.5, occupancy: 0 },
@@ -207,6 +234,10 @@ export const useStore = create<Store>((set, get) => ({
   },
   metrics: { totalPeople: 200, activeBuildings: initialBuildings.length, totalOccupancy: 0 },
   environment: { season: 'automne', dayPeriod: 'apresmidi', weekend: false },
+  scenario: { investmentAI: 0.7, investmentHumanities: 0.3, llmAgents: false },
+  // timeseries buffers
+  timeseries: [] as any,
+  tsAcc: 0 as any,
   selectedPersonId: null,
   hoveredBuildingId: null,
   effects: [],
@@ -218,6 +249,24 @@ export const useStore = create<Store>((set, get) => ({
   deptInteractions: [],
   deptFlashes: [],
   news: [],
+  agents: (() => {
+    // Seed a small society: 1 rector, 24 profs, 120 students
+    const arr: Agent[] = []
+  arr.push({ id: 'rector-1', role: 'rector', dept: 'adm', buildingId: 'adm', biases: { research: 0.4, collab: 0.7, rivalry: 0.2, ai: 0.5, humanities: 0.5 }, memory: [] })
+    const profDepts: Agent['dept'][] = ['eng','bio','eco','art','law']
+    let pid = 0
+    for (let i = 0; i < 24; i++) {
+      const d = profDepts[i % profDepts.length]!
+      const b = d === 'eng' ? 'eng' : d === 'bio' ? 'sci' : d === 'eco' ? 'bus' : d === 'art' ? 'art' : 'law'
+  arr.push({ id: `prof-${++pid}`, role: 'prof', dept: d, buildingId: b, biases: { research: 0.6, collab: 0.5, rivalry: 0.25, ai: d==='eng'||d==='bio' ? 0.8 : 0.3, humanities: d==='eng'||d==='bio' ? 0.2 : 0.7 }, memory: [], h: 0 })
+    }
+    for (let i = 0; i < 120; i++) {
+      const d = profDepts[i % profDepts.length]!
+      const b = d === 'eng' ? 'eng' : d === 'bio' ? 'sci' : d === 'eco' ? 'bus' : d === 'art' ? 'art' : 'law'
+  arr.push({ id: `stu-${i+1}`, role: 'student', dept: d, buildingId: b, biases: { research: 0.35, collab: 0.6, rivalry: 0.15, ai: d==='eng'||d==='bio' ? 0.7 : 0.4, humanities: d==='eng'||d==='bio' ? 0.3 : 0.6 }, memory: [] })
+    }
+    return arr
+  })(),
 
   applyDirective: (d) => set(state => {
     const pushNews = (item: Omit<NewsItem,'id'|'ts'>) => {
@@ -363,10 +412,10 @@ export const useStore = create<Store>((set, get) => ({
   }),
 
   tick: (dt) => set(state => {
-    // Departments autonomous dynamics
-    const pubRate = 0.25 // per second
-    const colRate = 0.15
-    const rivRate = 0.10
+    // Departments autonomous dynamics (affected by scenario investments)
+    const basePub = 0.25, baseCol = 0.15, baseRiv = 0.10
+    const aiW = state.scenario.investmentAI
+    const humW = state.scenario.investmentHumanities
     // process existing dept visuals
     if (state.deptInteractions.length) {
       state.deptInteractions = state.deptInteractions
@@ -380,6 +429,11 @@ export const useStore = create<Store>((set, get) => ({
     }
     // simulate per department
     for (const d of state.departments) {
+      const leanAI = d.id === 'eng' || d.id === 'bio'
+      const deptFactor = leanAI ? (0.6*aiW + 0.4*(1-humW)) : (0.6*humW + 0.4*(1-aiW))
+      const pubRate = basePub * (0.6 + 0.8 * deptFactor)
+      const colRate = baseCol * (0.6 + 0.7 * (aiW*0.6 + humW*0.4))
+      const rivRate = baseRiv * (0.7 + 0.6 * (aiW*0.5 + (1-humW)*0.3))
       // publish
       if (Math.random() < pubRate * dt) {
         d.publications += 1
@@ -554,7 +608,15 @@ export const useStore = create<Store>((set, get) => ({
     const activeCollaborations = state.deptInteractions.filter(e => e.type==='collab').length
     const activeRivalries = state.deptInteractions.filter(e => e.type==='rivalry').length
 
-    return { buildings: [...buildings], metrics: { totalPeople: state.people.length, activeBuildings, totalOccupancy, totalPublications, activeCollaborations, activeRivalries } }
+    // update time series every ~1s
+    state.tsAcc = (state.tsAcc ?? 0) + dt
+    if (state.tsAcc >= 1) {
+      state.tsAcc = 0
+      const sample = { ts: Date.now(), ai: state.scenario.investmentAI, hum: state.scenario.investmentHumanities, pubs: totalPublications, collabs: activeCollaborations, rivalries: activeRivalries } as TimeSample
+      state.timeseries = ([...(state.timeseries ?? []), sample]).slice(-180)
+    }
+
+    return { buildings: [...buildings], metrics: { totalPeople: state.people.length, activeBuildings, totalOccupancy, totalPublications, activeCollaborations, activeRivalries }, timeseries: state.timeseries, tsAcc: state.tsAcc }
   }),
 
   reset: () => set({ buildings: initialBuildings.map(b => ({...b})), people: initPeople(200, initialBuildings) }),
@@ -564,5 +626,76 @@ export const useStore = create<Store>((set, get) => ({
   }),
   setSelectedPerson: (id) => set({ selectedPersonId: id })
   ,
-  setHoveredBuilding: (id) => set({ hoveredBuildingId: id })
+  setHoveredBuilding: (id) => set({ hoveredBuildingId: id }),
+  setScenario: (s) => set(state => ({ scenario: { ...state.scenario, ...s } })),
+  applyAgentActions: (acts) => set(state => {
+    const pushNews = (text: string, kind: NewsItem['kind'] = 'system') => {
+      const id = state.news.length ? state.news[state.news.length-1].id + 1 : 1
+      state.news = [...state.news, { id, ts: Date.now(), kind, text }].slice(-50)
+    }
+    for (const a of acts) {
+      const ag = state.agents.find(x => x.id === a.id)
+      if (!ag) continue
+      const remember = (m: string) => {
+        ag.memory = [...(ag.memory ?? []), m].slice(-10)
+      }
+      if (a.publish) {
+        const d = ag.dept && state.departments.find(x => x.id === ag.dept)
+        if (d) {
+          d.publications += 1
+          const b = state.buildings.find(x => x.id === d.buildingId)
+          if (b) { b.activity = Math.min(1, b.activity + 0.05); state.deptFlashes.push({ buildingId: b.id, remaining: 2.0 }) }
+          pushNews(`📄 ${d.name}: publication (agents)`, 'pub')
+          if (ag.role === 'prof') ag.h = (ag.h ?? 0) + (0.5 + Math.random()*0.8)
+          remember('publication')
+        }
+      }
+      if (a.seekCollabWith) {
+        const from = ag.dept, to = a.seekCollabWith
+        if (from && to && from !== to) {
+          state.deptInteractions.push({ from, to, type: 'collab', remaining: 3.0 })
+          pushNews(`🤝 ${from.toUpperCase()} × ${to.toUpperCase()} (agents)`, 'collab')
+          remember(`collab:${from}->${to}`)
+        }
+      }
+      if (a.challenge) {
+        const from = ag.dept, to = a.challenge
+        if (from && to && from !== to) {
+          state.deptInteractions.push({ from, to, type: 'rivalry', remaining: 3.0 })
+          const bFrom = state.departments.find(x => x.id === from)
+          const bTo = state.departments.find(x => x.id === to)
+          if (bFrom) {
+            const bb = state.buildings.find(x => x.id === bFrom.buildingId); if (bb) bb.activity = Math.min(1, bb.activity + 0.02)
+          }
+          if (bTo) {
+            const bb = state.buildings.find(x => x.id === bTo.buildingId); if (bb) bb.activity = Math.max(0, bb.activity - 0.03)
+          }
+          pushNews(`⚔️ ${from.toUpperCase()} défie ${to.toUpperCase()} (agents)`, 'rivalry')
+          remember(`rivalry:${from}->${to}`)
+        }
+      }
+      if (a.moveTo) {
+        const b = state.buildings.find(x => x.id === a.moveTo)
+        if (b) {
+          // Retarget a few people as a crowd effect
+          const n = Math.min(10, Math.floor(5 + Math.random()*6))
+          for (let i = 0; i < n && i < state.people.length; i++) {
+            state.people[i].targetBuildingId = b.id
+          }
+          pushNews(`➡️ Mouvement vers ${b.name} (agents)`, 'people')
+          remember(`move:${b.id}`)
+        }
+      }
+      if (a.setInvestments) {
+        const ai = Math.max(0, Math.min(1, a.setInvestments.ai))
+        const humanities = Math.max(0, Math.min(1, a.setInvestments.humanities))
+        state.scenario.investmentAI = ai
+        state.scenario.investmentHumanities = humanities
+        pushNews(`💰 Politique: IA ${Math.round(ai*100)}% / Humanités ${Math.round(humanities*100)}%`, 'system')
+        remember(`budget:${Math.round(ai*100)}/${Math.round(humanities*100)}`)
+      }
+      if (a.message) pushNews(a.message, 'system')
+    }
+    return {}
+  })
 }))

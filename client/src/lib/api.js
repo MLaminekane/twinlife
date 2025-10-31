@@ -36,3 +36,25 @@ export async function sendLLM(prompt) {
         throw new Error('Invalid directive from server');
     return parsed.data;
 }
+// Agent API
+const AgentInputSchema = z.object({
+    id: z.string(),
+    role: z.union([z.literal('prof'), z.literal('student'), z.literal('rector')]),
+    dept: z.string().optional(),
+    buildingId: z.string().optional(),
+    biases: z.record(z.string(), z.number()).optional(),
+    goals: z.array(z.string()).optional(),
+    memory: z.array(z.string()).optional()
+});
+const WorldSchema = z.object({ investments: z.object({ ai: z.number(), humanities: z.number() }), departments: z.array(z.object({ id: z.string(), name: z.string(), publications: z.number(), activity: z.number() })), recentNews: z.array(z.string()).optional() });
+const AgentBatchSchema = z.object({ agents: z.array(AgentInputSchema), world: WorldSchema });
+const AgentActionSchema = z.object({ id: z.string(), publish: z.boolean().optional(), seekCollabWith: z.string().nullable().optional(), challenge: z.string().nullable().optional(), moveTo: z.string().nullable().optional(), message: z.string().optional(), setInvestments: z.object({ ai: z.number(), humanities: z.number() }).optional() });
+export async function sendAgentsDecision(payload) {
+    const res = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    if (!res.ok)
+        throw new Error('Agent API error');
+    const json = await res.json();
+    const actions = Array.isArray(json.actions) ? json.actions : [];
+    const parsed = actions.map((a) => AgentActionSchema.safeParse(a)).filter((p) => p.success).map((p) => p.data);
+    return { actions: parsed };
+}

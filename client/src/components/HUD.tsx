@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useStore } from '../state/store'
 import { NewsFeed } from './NewsFeed'
+import { TrendChart } from './TrendChart'
 
 export function HUD() {
   const metrics = useStore(s => s.metrics)
@@ -33,7 +34,12 @@ export function HUD() {
           </>
         )}
       </div>
-      {expanded && <NewsFeed />}
+      {expanded && (
+        <>
+          <TrendChart />
+          <NewsFeed />
+        </>
+      )}
     </div>
   )
 }

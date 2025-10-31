@@ -4,6 +4,7 @@ import cors from 'cors'
 import rateLimit from 'express-rate-limit'
 import { z } from 'zod'
 import { llmDirective } from './llm.js'
+import { agentDecideBatch, AgentBatchSchema } from './llm_agent.js'
 
 const app = express()
 app.use(express.json())
@@ -23,6 +24,18 @@ app.post('/api/llm', async (req, res) => {
   } catch (e: any) {
     console.error('LLM error', e)
     return res.status(500).json({ error: 'LLM failed' })
+  }
+})
+
+app.post('/api/agent', async (req, res) => {
+  const parsed = AgentBatchSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ error: 'Invalid agent payload' })
+  try {
+    const out = await agentDecideBatch(parsed.data)
+    return res.json(out)
+  } catch (e: any) {
+    console.error('Agent LLM error', e)
+    return res.status(500).json({ error: 'Agent LLM failed' })
   }
 })
 

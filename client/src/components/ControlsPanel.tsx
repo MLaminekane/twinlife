@@ -11,9 +11,11 @@ export function ControlsPanel() {
   const buildings = useStore(s => s.buildings)
   const people = useStore(s => s.people)
   const environment = useStore(s => s.environment)
+  const scenario = useStore(s => s.scenario)
   const applyDirective = useStore(s => s.applyDirective)
   const reset = useStore(s => s.reset)
   const setSelectedPerson = useStore(s => s.setSelectedPerson)
+  const setScenario = useStore(s => s.setScenario)
 
   const [prompt, setPrompt] = useState('Augmente l\'activité en Sciences et en Bibliothèque, ralentis un peu la simulation.')
   const [busy, setBusy] = useState(false)
@@ -71,6 +73,30 @@ export function ControlsPanel() {
         <button className="btn" onClick={() => { setSelectedPerson(null); setSearchMsg(null); setQuery('') }}>Effacer</button>
       </div>
       {searchMsg && <div className="small">{searchMsg}</div>}
+
+      <div className="separator" />
+      <div className="row"><label>Scénarios d'investissement</label></div>
+      <div className="row" style={{ gap: 8 }}>
+        <label>IA: {Math.round(scenario.investmentAI*100)}%</label>
+      </div>
+      <input className="input" type="range" min={0} max={1} step={0.05}
+        value={scenario.investmentAI}
+        onChange={(e) => {
+          const ai = Number(e.target.value)
+          const hum = Math.max(0, Math.min(1, 1 - ai))
+          setScenario({ investmentAI: ai, investmentHumanities: hum })
+        }}
+      />
+      <div className="row" style={{ gap: 8 }}>
+        <label>Humanités: {Math.round(scenario.investmentHumanities*100)}%</label>
+      </div>
+      <div className="row" style={{ gap: 8 }}>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <input type="checkbox" checked={scenario.llmAgents} onChange={(e) => setScenario({ llmAgents: e.target.checked })} />
+          Activer agents LLM
+        </label>
+      </div>
+      <div className="small">Testez: “plus d’IA que d’humanités” en poussant IA vers 70–90%. Les dynamiques de publications/collabs/rivalités s’ajusteront.</div>
 
       <div className="separator" />
       <div className="row"><label>Environnement</label></div>
