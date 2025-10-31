@@ -23,6 +23,7 @@ export function MapView() {
   const [expanded, setExpanded] = useState(false)
   const people = useStore(s => s.people)
   const buildings = useStore(s => s.buildings)
+  const hoveredId = useStore(s => s.hoveredBuildingId)
 
   if (!open) {
     return (
@@ -112,7 +113,7 @@ export function MapView() {
       const zp = zonePolygons.find(z => z.id === zone)!
       const [lng0, lat0] = unitToLngLat(b.position[0], b.position[2])
       if (pointInPoly([lng0, lat0], zp.coordinates)) {
-        return { type: 'Feature', geometry: { type: 'Point', coordinates: [lng0, lat0] }, properties: { zone, name: b.name } }
+        return { type: 'Feature', geometry: { type: 'Point', coordinates: [lng0, lat0] }, properties: { id: b.id, zone, name: b.name } }
       }
       // Otherwise sample within polygon bbox deterministically
       const xs = zp.coordinates.map(c => c[0])
@@ -130,7 +131,7 @@ export function MapView() {
         const [cx, cy] = centroid(zp.coordinates)
         lng = cx; lat = cy
       }
-      return { type: 'Feature', geometry: { type: 'Point', coordinates: [lng, lat] }, properties: { zone, name: b.name } }
+      return { type: 'Feature', geometry: { type: 'Point', coordinates: [lng, lat] }, properties: { id: b.id, zone, name: b.name } }
     })
     return { type: 'FeatureCollection', features: feats } as any
   }, [buildings])
@@ -199,7 +200,7 @@ export function MapView() {
         {/* Buildings grouped by zone */}
         <Source id="buildings" type="geojson" data={buildingsGeo}>
           <Layer id="bldg-circles" type="circle" paint={{
-            'circle-radius': 4,
+            'circle-radius': hoveredId ? ['case', ['==', ['get','id'], hoveredId], 8, 4] : 4,
             'circle-color': [
               'match', ['get','zone'],
               'uni', '#16a34a',
@@ -208,9 +209,9 @@ export function MapView() {
               'city', '#2563eb',
               '#94a3b8'
             ],
-            'circle-opacity': 0.9,
-            'circle-stroke-width': 1,
-            'circle-stroke-color': '#0b1220'
+            'circle-opacity': hoveredId ? ['case', ['==', ['get','id'], hoveredId], 1, 0.9] : 0.9,
+            'circle-stroke-width': hoveredId ? ['case', ['==', ['get','id'], hoveredId], 2, 1] : 1,
+            'circle-stroke-color': hoveredId ? ['case', ['==', ['get','id'], hoveredId], '#ffffff', '#0b1220'] : '#0b1220'
           }} />
         </Source>
       </Map>

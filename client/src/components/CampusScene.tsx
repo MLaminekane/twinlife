@@ -15,6 +15,7 @@ export function CampusScene() {
   const visible = useStore(s => s.settings.visibleBuildings)
   const labels = useStore(s => s.settings.labels)
   const tick = useStore(s => s.tick)
+  const setHovered = useStore(s => s.setHoveredBuilding)
 
   // Animation loop ticks simulation
   useFrame((_, dt) => tick(Math.min(0.05, dt)))
@@ -38,7 +39,12 @@ export function CampusScene() {
 
       {/* Buildings */}
       {buildings.filter(b => visible.has(b.id)).map((b) => (
-        <group key={b.id} position={[b.position[0], 0, b.position[2]]}>
+        <group
+          key={b.id}
+          position={[b.position[0], 0, b.position[2]]}
+          onPointerOver={(e) => { e.stopPropagation(); setHovered(b.id) }}
+          onPointerOut={(e) => { e.stopPropagation(); setHovered(null) }}
+        >
           <BuildingMesh building={b} />
           {labels && (
             <Text position={[0, b.size[1] + 0.6, 0]} fontSize={0.6} color="#cbd5e1" anchorX="center" anchorY="middle">

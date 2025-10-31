@@ -100,6 +100,7 @@ export const useStore = create((set, get) => ({
     metrics: { totalPeople: 200, activeBuildings: initialBuildings.length, totalOccupancy: 0 },
     environment: { season: 'automne', dayPeriod: 'apresmidi', weekend: false },
     selectedPersonId: null,
+    hoveredBuildingId: null,
     effects: [],
     applyDirective: (d) => set(state => {
         let buildings = state.buildings.map(b => ({ ...b }));
@@ -401,5 +402,6 @@ export const useStore = create((set, get) => ({
         const bs = state.buildings.map(b => ({ ...b, activity: 0.2 + Math.random() * 0.6, occupancy: 0 }));
         return { buildings: bs, people: initPeople(state.people.length, bs) };
     }),
-    setSelectedPerson: (id) => set({ selectedPersonId: id })
+    setSelectedPerson: (id) => set({ selectedPersonId: id }),
+    setHoveredBuilding: (id) => set({ hoveredBuildingId: id })
 }));

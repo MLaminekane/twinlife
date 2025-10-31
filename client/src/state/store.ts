@@ -70,6 +70,7 @@ export type Store = {
   metrics: Metrics
   environment: Environment
   selectedPersonId: number | null
+  hoveredBuildingId: string | null
   effects: Array<
     | { type: 'activityRevert'; buildingId: string; delta: number; remaining: number }
     | { type: 'pause'; remaining: number }
@@ -79,6 +80,7 @@ export type Store = {
   reset: () => void
   resetRandom: () => void
   setSelectedPerson: (id: number | null) => void
+  setHoveredBuilding: (id: string | null) => void
 }
 
 const initialBuildings: Building[] = [
@@ -183,6 +185,7 @@ export const useStore = create<Store>((set, get) => ({
   metrics: { totalPeople: 200, activeBuildings: initialBuildings.length, totalOccupancy: 0 },
   environment: { season: 'automne', dayPeriod: 'apresmidi', weekend: false },
   selectedPersonId: null,
+  hoveredBuildingId: null,
   effects: [],
 
   applyDirective: (d) => set(state => {
@@ -464,4 +467,6 @@ export const useStore = create<Store>((set, get) => ({
     return { buildings: bs, people: initPeople(state.people.length, bs) }
   }),
   setSelectedPerson: (id) => set({ selectedPersonId: id })
+  ,
+  setHoveredBuilding: (id) => set({ hoveredBuildingId: id })
 }))
