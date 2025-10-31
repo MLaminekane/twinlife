@@ -9,6 +9,7 @@ import { Zones } from './Zones'
 import { ActivityBars } from './ActivityBars'
 import { Roads } from './Roads'
 import { BuildingMesh } from './BuildingMesh'
+import { DepartmentsOverlay } from './DepartmentsOverlay'
 
 export function CampusScene() {
   const buildings = useStore(s => s.buildings)
@@ -16,6 +17,7 @@ export function CampusScene() {
   const labels = useStore(s => s.settings.labels)
   const tick = useStore(s => s.tick)
   const setHovered = useStore(s => s.setHoveredBuilding)
+  const hoveredId = useStore(s => s.hoveredBuildingId)
 
   // Animation loop ticks simulation
   useFrame((_, dt) => tick(Math.min(0.05, dt)))
@@ -37,6 +39,9 @@ export function CampusScene() {
   {/* Roads and names */}
       <Roads />
 
+    {/* Departments interactions overlay */}
+    <DepartmentsOverlay />
+
       {/* Buildings */}
       {buildings.filter(b => visible.has(b.id)).map((b) => (
         <group
@@ -53,6 +58,19 @@ export function CampusScene() {
           )}
         </group>
       ))}
+
+      {/* Hover highlight ring for the active building (from 3D or Map) */}
+      {hoveredId && (() => {
+        const hb = buildings.find(bb => bb.id === hoveredId)
+        if (!hb) return null
+        const r = Math.max(hb.size[0], hb.size[2]) * 0.75
+        return (
+          <mesh position={[hb.position[0], 0.02, hb.position[2]]} rotation-x={-Math.PI/2}>
+            <ringGeometry args={[Math.max(0.1, r * 0.9), r, 48]} />
+            <meshBasicMaterial color="#ffffff" transparent opacity={0.85} />
+          </mesh>
+        )
+      })()}
 
       {/* Activity bars under buildings */}
       <ActivityBars />

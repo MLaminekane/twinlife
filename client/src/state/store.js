@@ -102,7 +102,21 @@ export const useStore = create((set, get) => ({
     selectedPersonId: null,
     hoveredBuildingId: null,
     effects: [],
+    departments: [
+        { id: 'eco', name: 'Économie', buildingId: 'bus', publications: 0, collaborations: {}, rivalries: {} },
+        { id: 'bio', name: 'Biologie', buildingId: 'sci', publications: 0, collaborations: {}, rivalries: {} },
+        { id: 'eng', name: 'Ingénierie', buildingId: 'eng', publications: 0, collaborations: {}, rivalries: {} },
+    ],
+    deptInteractions: [],
+    deptFlashes: [],
+    news: [],
     applyDirective: (d) => set(state => {
+        const pushNews = (item) => {
+            const id = state.news.length ? state.news[state.news.length - 1].id + 1 : 1;
+            const next = [...state.news, { ...item, id, ts: Date.now() }];
+            // keep last 50
+            state.news = next.slice(Math.max(0, next.length - 50));
+        };
         let buildings = state.buildings.map(b => ({ ...b }));
         const settings = { ...state.settings };
         let envOut = state.environment;
@@ -149,11 +163,13 @@ export const useStore = create((set, get) => ({
                     if (b) {
                         b.activity = Math.max(0, Math.min(1, b.activity + e.delta));
                         effectsOut.push({ type: 'activityRevert', buildingId: b.id, delta: e.delta, remaining: e.durationSec });
+                        pushNews({ kind: 'activity', text: `⚡ Pic d'activité sur ${b.name} (+${e.delta.toFixed(2)}) pendant ${e.durationSec}s` });
                     }
                 }
                 else if (e.type === 'pause') {
                     settings.running = false;
                     effectsOut.push({ type: 'pause', remaining: e.durationSec });
+                    pushNews({ kind: 'system', text: `⏸️ Pause de ${e.durationSec}s` });
                 }
             });
         }
@@ -174,6 +190,7 @@ export const useStore = create((set, get) => ({
                 }
                 buildings.push({ id, name: add.name, position: [pos[0], 2, pos[2]], size, activity: 0.5, occupancy: 0 });
                 settings.visibleBuildings.add(id);
+                pushNews({ kind: 'building', text: `🏗️ Nouveau bâtiment: ${add.name}` });
             });
         }
         // Add people
@@ -191,6 +208,7 @@ export const useStore = create((set, get) => ({
                     ];
                     state.people.push({ id, position: pos, targetBuildingId: b.id, speed: 0.8 + Math.random() * 0.6, gender: add.gender, name: randomName(Math.random) });
                 }
+                pushNews({ kind: 'people', text: `➕ ${add.count} personnes ajoutées${target ? ` vers ${target.name}` : ''}` });
             });
         }
         // Visibility controls
@@ -241,6 +259,61 @@ export const useStore = create((set, get) => ({
         return { buildings, settings, effects: effectsOut, environment: envOut };
     }),
     tick: (dt) => set(state => {
+        // Departments autonomous dynamics
+        const pubRate = 0.25; // per second
+        const colRate = 0.15;
+        const rivRate = 0.10;
+        // process existing dept visuals
+        if (state.deptInteractions.length) {
+            state.deptInteractions = state.deptInteractions
+                .map(e => ({ ...e, remaining: e.remaining - dt }))
+                .filter(e => e.remaining > 0);
+        }
+        if (state.deptFlashes.length) {
+            state.deptFlashes = state.deptFlashes
+                .map(f => ({ ...f, remaining: f.remaining - dt }))
+                .filter(f => f.remaining > 0);
+        }
+        // simulate per department
+        for (const d of state.departments) {
+            // publish
+            if (Math.random() < pubRate * dt) {
+                d.publications += 1;
+                const b = state.buildings.find(x => x.id === d.buildingId);
+                if (b)
+                    b.activity = Math.min(1, b.activity + 0.05);
+                state.deptFlashes.push({ buildingId: d.buildingId, remaining: 2.0 });
+                const label = d.name;
+                const id = state.news.length ? state.news[state.news.length - 1].id + 1 : 1;
+                state.news = [...state.news, { id, ts: Date.now(), kind: 'pub', text: `📄 ${label} publie un article (total ${d.publications})` }].slice(-50);
+            }
+            // collaboration
+            if (Math.random() < colRate * dt) {
+                const others = state.departments.filter(x => x.id !== d.id);
+                const peer = others[Math.floor(Math.random() * others.length)];
+                d.collaborations[peer.id] = (d.collaborations[peer.id] ?? 0) + 1;
+                peer.collaborations[d.id] = (peer.collaborations[d.id] ?? 0) + 1;
+                state.deptInteractions.push({ from: d.id, to: peer.id, type: 'collab', remaining: 3.0 });
+                const id = state.news.length ? state.news[state.news.length - 1].id + 1 : 1;
+                state.news = [...state.news, { id, ts: Date.now(), kind: 'collab', text: `🤝 ${d.name} × ${peer.name} lancent une collaboration` }].slice(-50);
+            }
+            // rivalry
+            if (Math.random() < rivRate * dt) {
+                const others = state.departments.filter(x => x.id !== d.id);
+                const peer = others[Math.floor(Math.random() * others.length)];
+                d.rivalries[peer.id] = (d.rivalries[peer.id] ?? 0) + 1;
+                // small nudge: self +, peer -
+                const bSelf = state.buildings.find(x => x.id === d.buildingId);
+                const bPeer = state.buildings.find(x => x.id === peer.buildingId);
+                if (bSelf)
+                    bSelf.activity = Math.min(1, bSelf.activity + 0.02);
+                if (bPeer)
+                    bPeer.activity = Math.max(0, bPeer.activity - 0.03);
+                state.deptInteractions.push({ from: d.id, to: peer.id, type: 'rivalry', remaining: 3.0 });
+                const id = state.news.length ? state.news[state.news.length - 1].id + 1 : 1;
+                state.news = [...state.news, { id, ts: Date.now(), kind: 'rivalry', text: `⚔️ ${d.name} défie ${peer.name}` }].slice(-50);
+            }
+        }
         // Environment-driven baseline influences
         const env = state.environment;
         // Compute a baseline activity target per building based on env
@@ -395,7 +468,10 @@ export const useStore = create((set, get) => ({
         }
         const activeBuildings = buildings.filter(b => b.activity > 0.3).length;
         const totalOccupancy = buildings.reduce((s, b) => s + b.occupancy, 0);
-        return { buildings: [...buildings], metrics: { totalPeople: state.people.length, activeBuildings, totalOccupancy } };
+        const totalPublications = state.departments.reduce((s, d) => s + d.publications, 0);
+        const activeCollaborations = state.deptInteractions.filter(e => e.type === 'collab').length;
+        const activeRivalries = state.deptInteractions.filter(e => e.type === 'rivalry').length;
+        return { buildings: [...buildings], metrics: { totalPeople: state.people.length, activeBuildings, totalOccupancy, totalPublications, activeCollaborations, activeRivalries } };
     }),
     reset: () => set({ buildings: initialBuildings.map(b => ({ ...b })), people: initPeople(200, initialBuildings) }),
     resetRandom: () => set(state => {

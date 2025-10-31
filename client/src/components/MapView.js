@@ -21,6 +21,7 @@ export function MapView() {
     const people = useStore(s => s.people);
     const buildings = useStore(s => s.buildings);
     const hoveredId = useStore(s => s.hoveredBuildingId);
+    const setHovered = useStore(s => s.setHoveredBuilding);
     if (!open) {
         return (_jsx("button", { className: "btn", style: { position: 'absolute', left: 10, bottom: 10, zIndex: 20 }, onClick: () => setOpen(true), children: "\uD83D\uDDFA\uFE0F Ville" }));
     }
@@ -128,7 +129,13 @@ export function MapView() {
     const containerStyle = expanded
         ? { position: 'absolute', inset: 10, borderRadius: 12, overflow: 'hidden', border: '1px solid #1f2937', zIndex: 20, boxShadow: '0 8px 28px rgba(0,0,0,0.35)' }
         : { position: 'absolute', left: 10, bottom: 10, width: 460, height: 320, borderRadius: 12, overflow: 'hidden', border: '1px solid #1f2937', zIndex: 20, boxShadow: '0 8px 28px rgba(0,0,0,0.35)' };
-    return (_jsxs("div", { style: containerStyle, children: [_jsxs("div", { style: { position: 'absolute', right: 8, top: 6, display: 'flex', gap: 8, zIndex: 21 }, children: [_jsx("button", { className: "btn", onClick: () => setExpanded(e => !e), children: expanded ? '↙︎' : '⤢' }), _jsx("button", { className: "btn", onClick: () => setOpen(false), children: "\u2716" })] }), _jsxs(Map, { mapboxAccessToken: TOKEN, initialViewState: { longitude: CITY.lon, latitude: CITY.lat, zoom: expanded ? 12.2 : 11.2 }, mapStyle: "mapbox://styles/mapbox/dark-v11", attributionControl: false, style: { width: '100%', height: '100%' }, maxBounds: [[-71.40, 48.25], [-70.80, 48.60]], children: [_jsx(NavigationControl, { position: "top-left" }), _jsx(ScaleControl, { maxWidth: 120, unit: "metric" }), _jsxs(Source, { id: "zones", type: "geojson", data: zonesGeo, children: [_jsx(Layer, { id: "zones-fill", type: "fill", paint: {
+    return (_jsxs("div", { style: containerStyle, children: [_jsxs("div", { style: { position: 'absolute', right: 8, top: 6, display: 'flex', gap: 8, zIndex: 21 }, children: [_jsx("button", { className: "btn", onClick: () => setExpanded(e => !e), children: expanded ? '↙︎' : '⤢' }), _jsx("button", { className: "btn", onClick: () => setOpen(false), children: "\u2716" })] }), _jsxs(Map, { mapboxAccessToken: TOKEN, initialViewState: { longitude: CITY.lon, latitude: CITY.lat, zoom: expanded ? 12.2 : 11.2 }, mapStyle: "mapbox://styles/mapbox/dark-v11", attributionControl: false, style: { width: '100%', height: '100%' }, maxBounds: [[-71.40, 48.25], [-70.80, 48.60]], interactiveLayerIds: ['bldg-circles'], onMouseMove: (e) => {
+                    const fid = e.features && e.features[0] && e.features[0].properties?.id;
+                    setHovered(fid ?? null);
+                }, onClick: (e) => {
+                    const fid = e.features && e.features[0] && e.features[0].properties?.id;
+                    setHovered(fid ?? null);
+                }, children: [_jsx(NavigationControl, { position: "top-left" }), _jsx(ScaleControl, { maxWidth: 120, unit: "metric" }), _jsxs(Source, { id: "zones", type: "geojson", data: zonesGeo, children: [_jsx(Layer, { id: "zones-fill", type: "fill", paint: {
                                     'fill-color': ['get', 'color'],
                                     'fill-opacity': 0.12
                                 } }), _jsx(Layer, { id: "zones-outline", type: "line", paint: {

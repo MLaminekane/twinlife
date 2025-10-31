@@ -24,6 +24,7 @@ export function MapView() {
   const people = useStore(s => s.people)
   const buildings = useStore(s => s.buildings)
   const hoveredId = useStore(s => s.hoveredBuildingId)
+  const setHovered = useStore(s => s.setHoveredBuilding)
 
   if (!open) {
     return (
@@ -155,6 +156,15 @@ export function MapView() {
         attributionControl={false}
         style={{ width: '100%', height: '100%' }}
         maxBounds={[[-71.40, 48.25], [-70.80, 48.60]]}
+        interactiveLayerIds={[ 'bldg-circles' ]}
+        onMouseMove={(e: any) => {
+          const fid = e.features && e.features[0] && e.features[0].properties?.id
+          setHovered(fid ?? null)
+        }}
+        onClick={(e: any) => {
+          const fid = e.features && e.features[0] && e.features[0].properties?.id
+          setHovered(fid ?? null)
+        }}
       >
         <NavigationControl position="top-left" />
         <ScaleControl maxWidth={120} unit="metric" />
