@@ -2,9 +2,9 @@ import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import rateLimit from 'express-rate-limit'
-import { z } from 'zod'
 import { llmDirective } from './llm.js'
 import { agentDecideBatch, AgentBatchSchema } from './llm_agent.js'
+import { PromptSchema } from './schemas.js'
 
 const app = express()
 app.use(express.json())
@@ -12,8 +12,6 @@ app.use(cors())
 
 const limiter = rateLimit({ windowMs: 15*60*1000, max: 180 })
 app.use('/api/', limiter)
-
-const PromptSchema = z.object({ prompt: z.string().min(1).max(2000) })
 
 app.post('/api/llm', async (req, res) => {
   const parsed = PromptSchema.safeParse(req.body)

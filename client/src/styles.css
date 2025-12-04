@@ -2,38 +2,158 @@
 @import url('mapbox-gl/dist/mapbox-gl.css');
 
 /* Reset and layout */
-* { box-sizing: border-box; }
-html, body, #root { height: 100%; margin: 0; }
-body { background: #0a0e14; color: #e5e7eb; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+* {
+	box-sizing: border-box;
+}
 
-.app-root { position: relative; height: 100vh; overflow: hidden; }
-.app-root canvas { position: absolute !important; inset: 0; display: block; width: 100% !important; height: 100% !important; }
+html,
+body,
+#root {
+	height: 100%;
+	margin: 0;
+}
+
+body {
+	background: #0a0e14;
+	color: #e5e7eb;
+	font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+.app-root {
+	position: relative;
+	height: 100vh;
+	overflow: hidden;
+}
+
+.app-root canvas {
+	position: absolute !important;
+	inset: 0;
+	display: block;
+	width: 100% !important;
+	height: 100% !important;
+}
 
 /* HUD */
-.hud { position: absolute; left: 8px; top: 8px; background: rgba(17, 24, 39, 0.72); border: 1px solid #1f2937; border-radius: 10px; padding: 8px 12px; backdrop-filter: blur(6px); box-shadow: 0 6px 18px rgba(0,0,0,0.25); font-size: 14px; }
-.badge { background: #0ea5e9; color: #072638; border-radius: 8px; padding: 2px 8px; font-weight: 700; }
-.badge:hover { filter: brightness(1.05); }
+.hud {
+	position: absolute;
+	left: 8px;
+	top: 8px;
+	background: rgba(17, 24, 39, 0.72);
+	border: 1px solid #1f2937;
+	border-radius: 10px;
+	padding: 8px 12px;
+	backdrop-filter: blur(6px);
+	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+	font-size: 14px;
+}
+
+.badge {
+	background: #0ea5e9;
+	color: #072638;
+	border-radius: 8px;
+	padding: 2px 8px;
+	font-weight: 700;
+}
+
+.badge:hover {
+	filter: brightness(1.05);
+}
 
 /* Panel */
-.panel { position: absolute; right: 10px; top: 10px; width: 360px; max-height: 88vh; overflow: auto; background: rgba(17, 24, 39, 0.88); border: 1px solid #1f2937; border-radius: 12px; padding: 12px 14px; box-shadow: 0 8px 28px rgba(0,0,0,0.35); }
-.panel h3 { margin: 4px 0 10px; font-size: 18px; color: #f3f4f6; }
-.row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.separator { height: 1px; background: #1f2937; margin: 10px 0; }
-.small { color: #9ca3af; font-size: 12px; margin-top: 4px; }
+.panel {
+	position: absolute;
+	right: 10px;
+	top: 10px;
+	width: 360px;
+	max-height: 88vh;
+	overflow: auto;
+	background: rgba(17, 24, 39, 0.88);
+	border: 1px solid #1f2937;
+	border-radius: 12px;
+	padding: 12px 14px;
+	box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
 
-.btn { appearance: none; border: 1px solid #374151; background: #111827; color: #e5e7eb; padding: 6px 10px; border-radius: 8px; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03); }
-.btn:hover { background: #0b1220; }
-.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.panel h3 {
+	margin: 4px 0 10px;
+	font-size: 18px;
+	color: #f3f4f6;
+}
 
-.input, textarea, select { width: 100%; border: 1px solid #374151; background: #0b1220; color: #e5e7eb; padding: 6px 8px; border-radius: 8px; outline: none; }
-textarea { min-height: 90px; resize: vertical; }
-label { color: #cbd5e1; font-size: 14px; }
-input[type="checkbox"] { accent-color: #3b82f6; }
+.row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	flex-wrap: wrap;
+}
+
+.separator {
+	height: 1px;
+	background: #1f2937;
+	margin: 10px 0;
+}
+
+.small {
+	color: #9ca3af;
+	font-size: 12px;
+	margin-top: 4px;
+}
+
+.btn {
+	appearance: none;
+	border: 1px solid #374151;
+	background: #111827;
+	color: #e5e7eb;
+	padding: 6px 10px;
+	border-radius: 8px;
+	cursor: pointer;
+	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.btn:hover {
+	background: #0b1220;
+}
+
+.btn:disabled {
+	opacity: 0.6;
+	cursor: not-allowed;
+}
+
+.input,
+textarea,
+select {
+	width: 100%;
+	border: 1px solid #374151;
+	background: #0b1220;
+	color: #e5e7eb;
+	padding: 6px 8px;
+	border-radius: 8px;
+	outline: none;
+}
+
+textarea {
+	min-height: 90px;
+	resize: vertical;
+}
+
+label {
+	color: #cbd5e1;
+	font-size: 14px;
+}
+
+input[type="checkbox"] {
+	accent-color: #3b82f6;
+}
 
 /* Responsive */
 @media (max-width: 900px) {
-	.panel { width: 92vw; right: 4vw; }
-	.hud { left: 6px; top: 6px; }
+	.panel {
+		width: 92vw;
+		right: 4vw;
+	}
+
+	.hud {
+		left: 6px;
+		top: 6px;
+	}
 }
-
-

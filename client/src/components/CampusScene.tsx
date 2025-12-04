@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { Text, Grid } from '@react-three/drei'
 import { useRef, useMemo } from 'react'
 import { useStore } from '../state/store'
-import { PeoplePoints } from './PeoplePoints'
+import { InstancedPeople } from './InstancedPeople'
 import { PeopleLabels } from './PeopleLabels'
 import { Zones } from './Zones'
 import { ActivityBars } from './ActivityBars'
@@ -25,7 +25,7 @@ export function CampusScene() {
   return (
     <group>
       {/* Ground */}
-      <mesh rotation-x={-Math.PI/2} receiveShadow>
+      <mesh rotation-x={-Math.PI / 2} receiveShadow>
         <planeGeometry args={[80, 80]} />
         <meshStandardMaterial color="#0c121a" />
       </mesh>
@@ -33,14 +33,14 @@ export function CampusScene() {
       {/* Zone overlays and labels */}
       <Zones />
 
-  {/* Subtle ground grid */}
-  <Grid position={[0, 0.002, 0]} args={[80, 80]} cellSize={2} cellThickness={0.4} sectionSize={10} sectionThickness={1} fadeDistance={40} fadeStrength={1} infiniteGrid />
+      {/* Subtle ground grid */}
+      <Grid position={[0, 0.002, 0]} args={[80, 80]} cellSize={2} cellThickness={0.4} sectionSize={10} sectionThickness={1} fadeDistance={40} fadeStrength={1} infiniteGrid />
 
-  {/* Roads and names */}
+      {/* Roads and names */}
       <Roads />
 
-    {/* Departments interactions overlay */}
-    <DepartmentsOverlay />
+      {/* Departments interactions overlay */}
+      <DepartmentsOverlay />
 
       {/* Buildings */}
       {buildings.filter(b => visible.has(b.id)).map((b) => (
@@ -65,7 +65,7 @@ export function CampusScene() {
         if (!hb) return null
         const r = Math.max(hb.size[0], hb.size[2]) * 0.75
         return (
-          <mesh position={[hb.position[0], 0.02, hb.position[2]]} rotation-x={-Math.PI/2}>
+          <mesh position={[hb.position[0], 0.02, hb.position[2]]} rotation-x={-Math.PI / 2}>
             <ringGeometry args={[Math.max(0.1, r * 0.9), r, 48]} />
             <meshBasicMaterial color="#ffffff" transparent opacity={0.85} />
           </mesh>
@@ -76,7 +76,7 @@ export function CampusScene() {
       <ActivityBars />
 
       {/* People */}
-      <PeoplePoints />
+      <InstancedPeople />
       <PeopleLabels />
     </group>
   )

@@ -1,0 +1,29 @@
+flowchart TB
+  subgraph Client["Client — React, R3F, Mapbox"]
+    U[Utilisateur]
+    UI[UI et Panneau de controles]
+    ST[Zustand Store]
+    SCN["Scene 3D<br/>(Batiments, Personnes, HUD)"]
+    MAP["Mapbox Paris<br/>(Heatmap · Points)"]
+    U -->|Saisie / clics| UI
+    UI -->|applyDirective| ST
+    ST -->|tick| SCN
+    ST -->|people -> GeoJSON| MAP
+  end
+
+  subgraph Server["Serveur — Express, Zod"]
+    API["POST /api/llm"]
+    PARSER["Validation Zod (Directive)"]
+    DS{"Cle LLM ?"}
+    LLM["DeepSeek / OpenAI"]
+    F["Fallback Rules FR"]
+  end
+
+  UI -- prompt FR --> API
+  API --> PARSER
+  PARSER --> DS
+  DS -- Oui --> LLM
+  DS -- Non --> F
+  LLM -->|Directive JSON| PARSER
+  F -->|Directive JSON| PARSER
+  PARSER -->|Directive JSON| UI

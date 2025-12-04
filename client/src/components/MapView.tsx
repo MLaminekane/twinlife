@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import Map, { NavigationControl, ScaleControl, Source, Layer } from 'react-map-gl'
 import { useStore } from '../state/store'
 import { zonePolygons, ZoneKey } from '../config/zones'
+import { pointInPoly, centroid, deterministicRand } from '../lib/mapUtils'
 
 const TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoiZ3VudGhlcmRhcmsiLCJhIjoiY21oZTNxeTU0MGFqMDJscHVqbGw1cXlhMyJ9.KRym-Qviipx04U9AQnkODg'
 
@@ -13,7 +14,6 @@ const METERS_PER_UNIT = 50 // scene unit to meters scale
 
 function unitToLngLat(x: number, z: number): [number, number] {
   const dLon = x * METERS_PER_UNIT * DEG_LON_PER_M
-  // Invert Z so positive Z (scene forward) maps southward on the map
   const dLat = -z * METERS_PER_UNIT * DEG_LAT_PER_M
   return [CITY.lon + dLon, CITY.lat + dLat]
 }
@@ -72,7 +72,6 @@ export function MapView() {
     }
   }
 
-  // Zones from config polygons
   const zonesGeo = useMemo(() => {
     const features = zonePolygons.map(z => ({
       type: 'Feature',
@@ -82,35 +81,32 @@ export function MapView() {
     return { type: 'FeatureCollection', features } as any
   }, [])
 
-  // Simple point-in-polygon (ray casting) for lon/lat polygon
-  function pointInPoly(pt: [number, number], poly: [number, number][]): boolean {
-    let inside = false
-    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-      const xi = poly[i][0], yi = poly[i][1]
-      const xj = poly[j][0], yj = poly[j][1]
-      const intersect = ((yi > pt[1]) !== (yj > pt[1])) && (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi + 1e-12) + xi)
-      if (intersect) inside = !inside
-    }
-    return inside
-  }
-
-  function centroid(poly: [number, number][]): [number, number] {
-    // polygon centroid (approx)
-    let x = 0, y = 0
-    for (const p of poly) { x += p[0]; y += p[1] }
-    return [x / poly.length, y / poly.length]
-  }
-
-  function deterministicRand(id: string): number {
-    let h = 2166136261
-    for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619)
-    return (h >>> 0) / 4294967296
-  }
-
-  // Buildings as circles, sampled inside zone polygons (deterministic scatter)
   const buildingsGeo = useMemo(() => {
     const feats = buildings.map(b => {
-      const zone: ZoneKey = b.id.startsWith('plz-') ? 'plz' : b.id.startsWith('city-') ? 'city' : b.id.startsWith('res-') ? 'res' : 'uni'
+      // Déterminer la zone selon l'ID du bâtiment
+      let zone: ZoneKey = 'campus' // Par défaut
+      
+      // Campus (NW) : sci, eng, med, bus, art, law, lib, gym, cafe
+      if (b.id.match(/^(sci|eng|med|bus|art|law|lib|gym|cafe)$/)) {
+        zone = 'campus'
+      }
+      // Downtown (NE) : tech, corp, startup, bank, city, office, hospital, police
+      else if (b.id.includes('tech') || b.id.includes('corp') || b.id.includes('startup') || 
+               b.id.includes('bank') || b.id.includes('city') || b.id.includes('office') ||
+               b.id.includes('hospital') || b.id.includes('police')) {
+        zone = 'downtown'
+      }
+      // Residential (SW) : res-*, park, school
+      else if (b.id.includes('res-') || b.id.includes('park') || b.id.includes('school')) {
+        zone = 'residential'
+      }
+      // Commercial (SE) : mall, restaurant, cinema, supermarket, hotel, spa, market
+      else if (b.id.includes('mall') || b.id.includes('restaurant') || b.id.includes('cinema') ||
+               b.id.includes('supermarket') || b.id.includes('hotel') || b.id.includes('spa') ||
+               b.id.includes('market')) {
+        zone = 'commercial'
+      }
+      
       const zp = zonePolygons.find(z => z.id === zone)!
       const [lng0, lat0] = unitToLngLat(b.position[0], b.position[2])
       if (pointInPoly([lng0, lat0], zp.coordinates)) {
@@ -125,8 +121,8 @@ export function MapView() {
       let lat = minY + (maxY - minY) * ((seed * 23333 + 12345) % 1)
       // Try a few jitters to get inside
       for (let t = 0; t < 8 && !pointInPoly([lng, lat], zp.coordinates); t++) {
-        lng = minX + (maxX - minX) * ((seed * (t+2) * 1103515245 + 12345) % 1)
-        lat = minY + (maxY - minY) * ((seed * (t+3) * 134775813 + 1) % 1)
+        lng = minX + (maxX - minX) * ((seed * (t + 2) * 1103515245 + 12345) % 1)
+        lat = minY + (maxY - minY) * ((seed * (t + 3) * 134775813 + 1) % 1)
       }
       if (!pointInPoly([lng, lat], zp.coordinates)) {
         const [cx, cy] = centroid(zp.coordinates)
@@ -156,7 +152,7 @@ export function MapView() {
         attributionControl={false}
         style={{ width: '100%', height: '100%' }}
         maxBounds={[[-71.40, 48.25], [-70.80, 48.60]]}
-        interactiveLayerIds={[ 'bldg-circles' ]}
+        interactiveLayerIds={['bldg-circles']}
         onMouseMove={(e: any) => {
           const fid = e.features && e.features[0] && e.features[0].properties?.id
           setHovered(fid ?? null)
@@ -171,16 +167,16 @@ export function MapView() {
         {/* Zones fill */}
         <Source id="zones" type="geojson" data={zonesGeo}>
           <Layer id="zones-fill" type="fill" paint={{
-            'fill-color': ['get','color'],
+            'fill-color': ['get', 'color'],
             'fill-opacity': 0.12
           }} />
           <Layer id="zones-outline" type="line" paint={{
-            'line-color': ['get','color'],
+            'line-color': ['get', 'color'],
             'line-opacity': 0.6,
             'line-width': 1.2
           }} />
         </Source>
-  <Source id="people" type="geojson" data={peopleGeoJSON}>
+        <Source id="people" type="geojson" data={peopleGeoJSON}>
           <Layer
             id="people-heat"
             type="heatmap"
@@ -210,18 +206,18 @@ export function MapView() {
         {/* Buildings grouped by zone */}
         <Source id="buildings" type="geojson" data={buildingsGeo}>
           <Layer id="bldg-circles" type="circle" paint={{
-            'circle-radius': hoveredId ? ['case', ['==', ['get','id'], hoveredId], 8, 4] : 4,
+            'circle-radius': hoveredId ? ['case', ['==', ['get', 'id'], hoveredId], 8, 4] : 4,
             'circle-color': [
-              'match', ['get','zone'],
-              'uni', '#16a34a',
-              'plz', '#ef4444',
-              'res', '#8b5e34',
-              'city', '#2563eb',
+              'match', ['get', 'zone'],
+              'campus', '#16a34a',
+              'downtown', '#2563eb',
+              'residential', '#b45309',
+              'commercial', '#a21caf',
               '#94a3b8'
             ],
-            'circle-opacity': hoveredId ? ['case', ['==', ['get','id'], hoveredId], 1, 0.9] : 0.9,
-            'circle-stroke-width': hoveredId ? ['case', ['==', ['get','id'], hoveredId], 2, 1] : 1,
-            'circle-stroke-color': hoveredId ? ['case', ['==', ['get','id'], hoveredId], '#ffffff', '#0b1220'] : '#0b1220'
+            'circle-opacity': hoveredId ? ['case', ['==', ['get', 'id'], hoveredId], 1, 0.9] : 0.9,
+            'circle-stroke-width': hoveredId ? ['case', ['==', ['get', 'id'], hoveredId], 2, 1] : 1,
+            'circle-stroke-color': hoveredId ? ['case', ['==', ['get', 'id'], hoveredId], '#ffffff', '#0b1220'] : '#0b1220'
           }} />
         </Source>
       </Map>

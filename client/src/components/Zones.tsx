@@ -36,11 +36,6 @@ export function Zones() {
       <RoundedQuad pos={[-size/2, 0.001, -size/2]} color="#b45309" />
       <RoundedQuad pos={[ size/2, 0.001, -size/2]} color="#a21caf" />
 
-      {/* Labels */}
-      <Text position={[-size/2, 0.01, size/2]} fontSize={1.2} color="#cbd5e1" anchorX="center" anchorY="middle">Université</Text>
-      <Text position={[ size/2, 0.01, size/2]} fontSize={1.2} color="#cbd5e1" anchorX="center" anchorY="middle">Logement étudiant</Text>
-      <Text position={[-size/2, 0.01,-size/2]} fontSize={1.2} color="#cbd5e1" anchorX="center" anchorY="middle">Centre-ville</Text>
-      <Text position={[ size/2, 0.01,-size/2]} fontSize={1.2} color="#cbd5e1" anchorX="center" anchorY="middle">Place du Royaume</Text>
     </group>
   )
 }
