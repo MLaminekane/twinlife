@@ -13,6 +13,7 @@ import { AgentLoop } from './components/AgentLoop'
 import { PersistGate } from './components/PersistGate'
 import { LLMPanel } from './components/LLMPanel'
 import { BuildingActivityPanel } from './components/BuildingActivityPanel'
+import { DialogueModal } from './components/DialogueModal'
 
 export default function App() {
   const glow = useStore(s => s.settings.glow)
@@ -47,6 +48,7 @@ export default function App() {
         )}
       </Canvas>
       <HUD />
+      <DialogueModal />
   <AgentLoop />
   <PersistGate />
       <MapView />

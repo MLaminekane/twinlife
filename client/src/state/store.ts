@@ -110,8 +110,53 @@ export const useStore = create<Store>((set, get) => ({
     const timeStep = (dt * 10) / 60
     state.environment.gameTime = (state.environment.gameTime + timeStep) % 24
 
+    // Social Interaction Check (Every ~1s)
+    const shouldCheckSocial = Math.random() < 0.05 // 5% chance per frame (~3 times/sec)
+    
     // Update Agents (LangGraph Logic)
-    for (const p of state.people) {
+    for (let i = 0; i < state.people.length; i++) {
+        const p = state.people[i]
+        
+        // Ensure state exists (migration for old data)
+        if (!p.state) {
+            p.state = { currentActivity: 'idle', mood: 'neutral', history: [] }
+        }
+
+        // If talking, stay put and decrement timer (simulated by chance to stop)
+        if (p.state.currentActivity === 'talking') {
+            if (Math.random() < 0.01) { // 1% chance to stop talking per frame
+                p.state.currentActivity = 'idle'
+                p.state.talkingWith = undefined
+                p.state.mood = 'happy'
+            }
+            continue // Skip movement/behavior update while talking
+        }
+
+        // Social Check
+        if (shouldCheckSocial && p.state && p.state.currentActivity !== 'sleep' && p.state.currentActivity !== 'work') {
+            // Find neighbor
+            // Optimization: Only check next 5 people in array (random enough if array is shuffled or just simple heuristic)
+            // Better: Check people in same targetBuildingId if they are close
+            for (let j = i + 1; j < Math.min(i + 10, state.people.length); j++) {
+                const other = state.people[j]
+                if (!other || !other.state) continue
+                if (other.state.currentActivity === 'talking' || other.state.currentActivity === 'sleep') continue
+                
+                const dx = p.position[0] - other.position[0]
+                const dz = p.position[2] - other.position[2]
+                if (dx*dx + dz*dz < 2.0) { // Close enough (< 1.4m)
+                    // Interaction chance
+                    if (Math.random() < 0.3) {
+                        p.state.currentActivity = 'talking'
+                        p.state.talkingWith = other.id
+                        other.state.currentActivity = 'talking'
+                        other.state.talkingWith = p.id
+                        break
+                    }
+                }
+            }
+        }
+
         const decision = updateAgentBehavior(p, state.environment.gameTime, state.buildings, state.environment)
         if (decision.targetId) p.targetBuildingId = decision.targetId
         if (decision.mood) p.state.mood = decision.mood as any

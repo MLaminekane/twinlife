@@ -1,4 +1,4 @@
-import { Text } from '@react-three/drei'
+import { Text, Billboard } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useRef, useState } from 'react'
 import { useStore } from '../state/store'
@@ -14,18 +14,57 @@ const EMOJI_MAP: Record<string, string> = {
   idle: '😐',
   stressed: '😫',
   tired: '🥱',
-  happy: '😊'
+  happy: '😊',
+  talking: '💬'
 }
 
 function getEmoji(person: Person) {
   if (!person.state) return ''
   const { currentActivity, mood } = person.state
   
-  // Priority to mood if extreme
   if (mood === 'stressed') return EMOJI_MAP.stressed
-  // if (mood === 'tired') return EMOJI_MAP.tired // Maybe too common if everyone is tired at night
+  if (mood === 'tired') return EMOJI_MAP.tired
+  if (mood === 'talking') return EMOJI_MAP.talking
+  
+
+
+  
   
   return EMOJI_MAP[currentActivity] || ''
+}
+
+function ThoughtBubble({ person }: { person: Person }) {
+  const emoji = getEmoji(person)
+  const groupRef = useRef<any>(null)
+  
+  useFrame(({ clock }) => {
+    if (groupRef.current) {
+      // Smoothly follow the person
+      groupRef.current.position.set(
+        person.position[0],
+        0.9 + Math.sin(clock.getElapsedTime() * 3 + person.id) * 0.05,
+        person.position[2]
+      )
+    }
+  })
+
+  if (!emoji) return null
+
+  return (
+    <Billboard ref={groupRef} follow={true} lockX={false} lockY={false} lockZ={false}>
+      <Text
+        fontSize={0.35}
+        outlineWidth={0.02}
+        outlineColor="white"
+        color="black"
+        anchorX="center"
+        anchorY="bottom"
+        renderOrder={10}
+      >
+        {emoji}
+      </Text>
+    </Billboard>
+  )
 }
 
 export function PeopleThoughts() {
@@ -36,14 +75,12 @@ export function PeopleThoughts() {
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime()
-    if (t - lastUpdate.current > 0.2) { // Update 5 times a second
+    if (t - lastUpdate.current > 0.2) { // Update list every 200ms
       lastUpdate.current = t
       
-      // Simple distance check
-      // Optimization: Don't sort all 500, just pick first N that are close enough
       const candidates: Person[] = []
-      const maxDist = 20
-      const maxCount = 40
+      const maxDist = 25 // Increased range
+      const maxCount = 50 // More bubbles
       
       for (let i = 0; i < people.length; i++) {
         const p = people[i]
@@ -63,25 +100,9 @@ export function PeopleThoughts() {
 
   return (
     <>
-      {visibleAgents.map(p => {
-        const emoji = getEmoji(p)
-        if (!emoji) return null
-        return (
-          <Text
-            key={p.id}
-            position={[p.position[0], 0.8, p.position[2]]} // Slightly above head (head is at ~0.5 * 1.65 = 0.8)
-            fontSize={0.3}
-            outlineWidth={0.01}
-            outlineColor="white"
-            color="black"
-            anchorX="center"
-            anchorY="bottom"
-            renderOrder={10} // Ensure it renders on top of some things
-          >
-            {emoji}
-          </Text>
-        )
-      })}
+      {visibleAgents.map(p => (
+        <ThoughtBubble key={p.id} person={p} />
+      ))}
     </>
   )
 }

@@ -84,7 +84,13 @@ export function loadCustomPeople(): PersistedPerson[] {
     const stored = localStorage.getItem(STORAGE_KEYS.CUSTOM_PEOPLE)
     if (!stored) return []
     const data = JSON.parse(stored)
-    return data.people || []
+    const people = data.people || []
+    
+    // Migration: Ensure state exists
+    return people.map((p: any) => ({
+      ...p,
+      state: p.state || { currentActivity: 'idle', mood: 'neutral', history: [] }
+    }))
   } catch (e) {
     console.error('Failed to load custom people:', e)
     return []

@@ -36,8 +36,10 @@ export type Person = {
   }[]
   state: {
     currentActivity: string
-    mood: 'happy' | 'tired' | 'stressed' | 'neutral'
+    mood: 'happy' | 'tired' | 'stressed' | 'neutral' | 'talking'
     history: string[] // Last 5 building IDs
+    talkingWith?: number // ID of the other person
+    conversationTopic?: string
   }
 }
 

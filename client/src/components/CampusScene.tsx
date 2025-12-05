@@ -11,6 +11,7 @@ import { ActivityBars } from './ActivityBars'
 import { Roads } from './Roads'
 import { BuildingMesh } from './BuildingMesh'
 import { DepartmentsOverlay } from './DepartmentsOverlay'
+import { EnvironmentDetails } from './EnvironmentDetails'
 
 export function CampusScene() {
   const buildings = useStore(s => s.buildings)
@@ -40,6 +41,9 @@ export function CampusScene() {
 
       {/* Roads and names */}
       <Roads />
+      
+      {/* Trees, lamps, etc. */}
+      <EnvironmentDetails />
 
       {/* Departments interactions overlay */}
       <DepartmentsOverlay />
