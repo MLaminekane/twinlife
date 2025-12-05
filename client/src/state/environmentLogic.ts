@@ -51,10 +51,10 @@ export function computeEnvActivityTarget(b: Building, env: Environment): number 
   return Math.max(0, Math.min(1, base))
 }
 
-export function computeTargetPopulation(env: Environment, basePop: number = 200): number {
+export function computeTargetPopulation(env: Environment, basePop: number = 500): number {
   let factor = 1
-  if (env.dayPeriod === 'nuit') factor *= 0.6
-  if (env.weekend) factor *= 0.8
-  if (env.season === 'hiver') factor *= 0.9
-  return Math.max(20, Math.round(basePop * factor))
+  if (env.dayPeriod === 'nuit') factor *= 0.85
+  if (env.weekend) factor *= 0.9
+  if (env.season === 'hiver') factor *= 0.95
+  return Math.max(100, Math.round(basePop * factor))
 }

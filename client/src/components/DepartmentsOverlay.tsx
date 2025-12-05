@@ -46,7 +46,17 @@ export function DepartmentsOverlay() {
         const p = centerOf(f.buildingId)
         const alpha = Math.max(0, Math.min(1, f.remaining / 2.0))
         return (
-          <Text key={idx} position={[p[0], p[1]+0.8, p[2]]} fontSize={0.7} color={`rgba(255,255,255,${alpha})`} anchorX="center" anchorY="middle">📄</Text>
+          <Text 
+            key={idx} 
+            position={[p[0], p[1]+0.8, p[2]]} 
+            fontSize={0.7} 
+            color="white" 
+            fillOpacity={alpha}
+            anchorX="center" 
+            anchorY="middle"
+          >
+            📄
+          </Text>
         )
       })}
     </group>

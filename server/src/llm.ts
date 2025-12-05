@@ -4,11 +4,15 @@ import { DIRECTIVE_SYSTEM_PROMPT } from './config.js'
 import { fallbackDirectiveRules } from './fallbackDirectives.js'
 
 export async function llmDirective(prompt: string): Promise<Directive> {
+  console.log('[llmDirective] Prompt reçu:', prompt)
   const config = getLLMConfig()
   const llmClient = createLLMClient(config)
 
   // If no AI keys, fallback to rules
-  if (!llmClient) return fallbackDirectiveRules(prompt)
+  if (!llmClient) {
+    console.log('[llmDirective] Pas de clé API, utilisation du fallback')
+    return fallbackDirectiveRules(prompt)
+  }
 
   const { client, model } = llmClient
 
@@ -23,11 +27,17 @@ export async function llmDirective(prompt: string): Promise<Directive> {
       temperature: 0.2
     })
     const content = resp.choices[0]?.message?.content || '{}'
+    console.log('[llmDirective] Réponse LLM:', content)
     const json = JSON.parse(content)
     const parsed = DirectiveSchema.safeParse(json)
-    if (parsed.success) return parsed.data
+    if (parsed.success) {
+      console.log('[llmDirective] Directive validée:', parsed.data)
+      return parsed.data
+    }
+    console.log('[llmDirective] Validation échouée, utilisation du fallback:', parsed.error)
     return fallbackDirectiveRules(prompt)
   } catch (e) {
+    console.error('[llmDirective] Erreur:', e)
     return fallbackDirectiveRules(prompt)
   }
 }

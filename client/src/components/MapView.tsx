@@ -6,11 +6,11 @@ import { pointInPoly, centroid, deterministicRand } from '../lib/mapUtils'
 
 const TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoiZ3VudGhlcmRhcmsiLCJhIjoiY21oZTNxeTU0MGFqMDJscHVqbGw1cXlhMyJ9.KRym-Qviipx04U9AQnkODg'
 
-// Saguenay focus and simple local projection from scene units -> WGS84
+// Saguenay
 const CITY = { lon: -71.065, lat: 48.428 }
-const DEG_LAT_PER_M = 1 / 111320 // ~meters per deg latitude
+const DEG_LAT_PER_M = 1 / 111320 
 const DEG_LON_PER_M = 1 / (111320 * Math.cos((CITY.lat * Math.PI) / 180))
-const METERS_PER_UNIT = 50 // scene unit to meters scale
+const METERS_PER_UNIT = 50 
 
 function unitToLngLat(x: number, z: number): [number, number] {
   const dLon = x * METERS_PER_UNIT * DEG_LON_PER_M
@@ -25,6 +25,7 @@ export function MapView() {
   const buildings = useStore(s => s.buildings)
   const hoveredId = useStore(s => s.hoveredBuildingId)
   const setHovered = useStore(s => s.setHoveredBuilding)
+  const setSelectedBuilding = useStore(s => s.setSelectedBuilding)
 
   if (!open) {
     return (
@@ -137,7 +138,7 @@ export function MapView() {
 
   const containerStyle: React.CSSProperties = expanded
     ? { position: 'absolute', inset: 10, borderRadius: 12, overflow: 'hidden', border: '1px solid #1f2937', zIndex: 20, boxShadow: '0 8px 28px rgba(0,0,0,0.35)' }
-    : { position: 'absolute', left: 10, bottom: 10, width: 460, height: 320, borderRadius: 12, overflow: 'hidden', border: '1px solid #1f2937', zIndex: 20, boxShadow: '0 8px 28px rgba(0,0,0,0.35)' }
+    : { position: 'absolute', left: 10, bottom: 10, width: 300, height: 250, borderRadius: 12, overflow: 'hidden', border: '1px solid #1f2937', zIndex: 20, boxShadow: '0 8px 28px rgba(0,0,0,0.35)' }
 
   return (
     <div style={containerStyle}>
@@ -160,6 +161,7 @@ export function MapView() {
         onClick={(e: any) => {
           const fid = e.features && e.features[0] && e.features[0].properties?.id
           setHovered(fid ?? null)
+          setSelectedBuilding(fid ?? null)
         }}
       >
         <NavigationControl position="top-left" />

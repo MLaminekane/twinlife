@@ -10,7 +10,7 @@ const app = express()
 app.use(express.json())
 app.use(cors())
 
-const limiter = rateLimit({ windowMs: 15*60*1000, max: 180 })
+const limiter = rateLimit({ windowMs: 15*60*1000, max: 1000 })
 app.use('/api/', limiter)
 
 app.post('/api/llm', async (req, res) => {

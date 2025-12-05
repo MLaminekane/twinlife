@@ -2,9 +2,32 @@
 
 Un jumeau numérique de campus universitaire avec visualisation 3D temps réel, tableau de bord analytique, carte Mapbox de Saguenay et intégration LLM pour piloter des scénarios en langage naturel.
 
-## Présentation de la Problématique / Contexte d’Utilisation
+## Présentation de la Problématique / Contexte d'Utilisation
 
-Les directions d’université, DSI et équipes pédagogiques ont besoin d’une vue dynamique et compréhensible des activités du campus: affluence par bâtiment, flux de personnes, occupation, et influence du contexte (heure, saison, week‑end). Les outils classiques fragmentent ces informations et rendent difficile l’exploration de scénarios (ex. journée d’examens, midi, événement spécial) en temps réel. Twinlife propose un jumeau numérique interactif permettant d’observer, simuler et expliquer ces phénomènes, avec une interface accessible et des commandes en langage naturel.
+Les directions d'université, DSI et équipes pédagogiques ont besoin d'une vue dynamique et compréhensible des activités du campus: affluence par bâtiment, flux de personnes, occupation, et influence du contexte (heure, saison, week‑end). Les outils classiques fragmentent ces informations et rendent difficile l'exploration de scénarios (ex. journée d'examens, midi, événement spécial) en temps réel. Twinlife propose un jumeau numérique interactif permettant d'observer, simuler et expliquer ces phénomènes, avec une interface accessible et des commandes en langage naturel.
+
+## ✨ Nouvelles Fonctionnalités LLM (Décembre 2025)
+
+### 🤖 Assistant LLM Dynamique avec Persistance Complète
+
+Le système LLM peut maintenant **modifier dynamiquement** la simulation avec **sauvegarde automatique** :
+
+- **Créer des personnes** avec nom, rôle, lieu de travail et département
+- **Ajouter des bâtiments** dans les 4 zones (campus, downtown, residential, commercial)
+- **Supprimer** personnes et bâtiments
+- **Persistance localStorage** : toutes les modifications survivent au rechargement
+
+### Exemples de Commandes :
+
+```
+"ajoute Lamine comme employé à la banque"
+"crée un nouveau café dans la zone commerciale"
+"ajoute 5 étudiants à l'université"
+"construis un laboratoire de recherche sur le campus"
+"supprime le bâtiment X"
+```
+
+📖 **Documentation détaillée** : [LLM_SYSTEM.md](./LLM_SYSTEM.md)
 
 ## Brève Description du Projet
 

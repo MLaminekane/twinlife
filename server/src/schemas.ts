@@ -5,8 +5,37 @@ export const DirectiveSchema = z.object({
   buildingActivityChanges: z.array(z.object({ buildingName: z.string(), activityDelta: z.number() })).optional(),
   buildingActivitySet: z.array(z.object({ buildingName: z.string(), level: z.number() })).optional(),
   personFlows: z.array(z.object({ from: z.string().optional(), to: z.string(), count: z.number() })).optional(),
-  peopleAdd: z.array(z.object({ count: z.number(), gender: z.union([z.literal('male'), z.literal('female')]).optional(), to: z.string().optional() })).optional(),
-  buildingAdd: z.array(z.object({ name: z.string(), position: z.tuple([z.number(), z.number(), z.number()]).optional(), size: z.tuple([z.number(), z.number(), z.number()]).optional() })).optional(),
+  peopleAdd: z.array(z.object({ 
+    count: z.number(), 
+    gender: z.union([z.literal('male'), z.literal('female')]).optional(), 
+    to: z.string().optional(),
+    name: z.string().optional(),
+    role: z.union([z.literal('student'), z.literal('employee'), z.literal('professor'), z.literal('visitor'), z.literal('worker')]).optional(),
+    workplace: z.string().optional(),
+    department: z.string().optional(),
+    customData: z.record(z.any()).optional()
+  })).optional(),
+  buildingEvents: z.array(z.object({
+    buildingName: z.string(),
+    events: z.array(z.object({
+      text: z.string(),
+      type: z.union([z.literal('urgent'), z.literal('info'), z.literal('sale')]),
+      time: z.string().optional()
+    }))
+  })).optional(),
+  buildingAdd: z.array(z.object({ 
+    name: z.string(), 
+    position: z.tuple([z.number(), z.number(), z.number()]).optional(), 
+    size: z.tuple([z.number(), z.number(), z.number()]).optional(),
+    zone: z.union([z.literal('campus'), z.literal('downtown'), z.literal('residential'), z.literal('commercial')]).optional(),
+    activity: z.number().min(0).max(1).optional()
+  })).optional(),
+  buildingRemove: z.array(z.string()).optional(),
+  peopleRemove: z.array(z.object({
+    name: z.string().optional(),
+    id: z.number().optional(),
+    all: z.boolean().optional()
+  })).optional(),
   global: z.object({ speedMultiplier: z.number().optional(), speedSet: z.number().optional(), resetRandom: z.boolean().optional() }).partial().optional(),
   visibility: z.object({
     hide: z.array(z.string()).optional(),

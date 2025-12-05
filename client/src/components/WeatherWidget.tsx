@@ -25,7 +25,7 @@ export function WeatherWidget() {
         <div style={{
             position: 'absolute',
             top: 12,
-            right: 12,
+            right: 180,
             background: 'rgba(11,18,32,0.85)',
             backdropFilter: 'blur(8px)',
             border: '1px solid #1f2937',

@@ -5,6 +5,9 @@ export type Building = {
   size: [number, number, number]
   activity: number // 0..1
   occupancy: number // persons count inside
+  zone?: 'campus' | 'downtown' | 'residential' | 'commercial' // Zone d'appartenance
+  isCustom?: boolean // Marqueur pour les bâtiments créés dynamiquement
+  customData?: Record<string, any> // Données personnalisées
 }
 
 export type Person = {
@@ -14,6 +17,28 @@ export type Person = {
   speed: number
   gender?: 'male' | 'female'
   name: string
+  // Métadonnées professionnelles
+  role?: 'student' | 'employee' | 'professor' | 'visitor' | 'worker'
+  workplace?: string // ID du bâtiment où la personne travaille
+  department?: string // Département d'appartenance
+  customData?: Record<string, any> // Données personnalisées
+  
+  // LangGraph Agent Properties
+  traits: {
+    introversion: number // 0..1 (1 = avoids crowds)
+    punctuality: number // 0..1 (1 = strictly follows schedule)
+    energy: number // 0..1
+  }
+  schedule: {
+    time: number // 0-23
+    activity: 'work' | 'study' | 'eat' | 'sleep' | 'leisure'
+    targetId?: string
+  }[]
+  state: {
+    currentActivity: string
+    mood: 'happy' | 'tired' | 'stressed' | 'neutral'
+    history: string[] // Last 5 building IDs
+  }
 }
 
 export type Settings = {
@@ -40,6 +65,7 @@ export type Environment = {
   weekend: boolean
   realTime?: boolean
   temperature?: number
+  gameTime: number // 0-24
   condition?: 'clear' | 'rain' | 'snow' | 'cloudy'
 }
 
@@ -47,8 +73,29 @@ export type Directive = {
   buildingActivityChanges?: { buildingName: string; activityDelta: number }[]
   buildingActivitySet?: { buildingName: string; level: number }[]
   personFlows?: { from?: string; to: string; count: number }[]
-  peopleAdd?: { count: number; gender?: 'male' | 'female'; to?: string }[]
-  buildingAdd?: { name: string; position?: [number, number, number]; size?: [number, number, number] }[]
+  peopleAdd?: { 
+    count: number
+    gender?: 'male' | 'female'
+    to?: string
+    name?: string // Nom spécifique de la personne
+    role?: 'student' | 'employee' | 'professor' | 'visitor' | 'worker'
+    workplace?: string // Bâtiment de travail
+    department?: string
+    customData?: Record<string, any>
+  }[]
+  buildingEvents?: {
+    buildingName: string
+    events: { text: string; type: 'urgent' | 'info' | 'sale'; time?: string }[]
+  }[]
+  buildingAdd?: { 
+    name: string
+    position?: [number, number, number]
+    size?: [number, number, number]
+    zone?: 'campus' | 'downtown' | 'residential' | 'commercial'
+    activity?: number
+  }[]
+  buildingRemove?: string[] // IDs des bâtiments à supprimer
+  peopleRemove?: { name?: string; id?: number; all?: boolean }[] // Supprimer des personnes
   global?: { speedMultiplier?: number; speedSet?: number; resetRandom?: boolean }
   visibility?: {
     hide?: string[]
@@ -133,6 +180,7 @@ export type Store = {
   tsAcc?: number
   selectedPersonId: number | null
   hoveredBuildingId: string | null
+  selectedBuildingId: string | null
   effects: Array<
     | { type: 'activityRevert'; buildingId: string; delta: number; remaining: number }
     | { type: 'pause'; remaining: number }
@@ -141,6 +189,7 @@ export type Store = {
   deptInteractions: Array<{ from: string; to: string; type: 'collab' | 'rivalry'; remaining: number }>
   deptFlashes: Array<{ buildingId: string; remaining: number }>
   news: NewsItem[]
+  buildingEvents: Record<string, { text: string; type: 'urgent' | 'info' | 'sale'; time?: string }[]>
   agents: Agent[]
   applyDirective: (d: Directive) => void
   tick: (dt: number) => void
@@ -148,6 +197,7 @@ export type Store = {
   resetRandom: () => void
   setSelectedPerson: (id: number | null) => void
   setHoveredBuilding: (id: string | null) => void
+  setSelectedBuilding: (id: string | null) => void
   setScenario: (s: Partial<Scenario>) => void
   applyAgentActions: (acts: AgentAction[]) => void
   fetchRealWeather: () => Promise<void>

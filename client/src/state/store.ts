@@ -3,8 +3,10 @@ import { initialBuildings, initPeople } from '../config/initialData'
 import { applyDirective as applyDirectiveLogic } from '../lib/directives'
 import { randomName } from '../lib/helpers'
 import { initializeAgents, applyAgentActionsLogic } from './agentLogic'
+import { updateAgentBehavior } from '../sim/agentBehavior'
 import { computeEnvActivityTarget, computeTargetPopulation } from './environmentLogic'
 import { processDepartmentDynamics } from './departmentLogic'
+import { loadCustomBuildings, loadCustomPeople, saveState } from '../lib/persistence'
 import type { 
   Building, Person, Settings, Metrics, Environment, Directive, 
   Department, NewsItem, TimeSample, Agent, Scenario, AgentAction, Store 
@@ -15,25 +17,31 @@ export type {
   Department, NewsItem, TimeSample, Agent, Scenario, AgentAction, Store 
 }
 
+// Charger les données persistées au démarrage
+const customBuildings = loadCustomBuildings()
+const customPeople = loadCustomPeople()
+const allBuildings = [...initialBuildings, ...customBuildings]
+
 export const useStore = create<Store>((set, get) => ({
-  buildings: initialBuildings,
-  people: initPeople(200, initialBuildings),
+  buildings: allBuildings,
+  people: [...initPeople(500, allBuildings), ...customPeople],
   settings: {
     running: true,
     speed: 1,
     glow: true,
     shadows: true,
     labels: true,
-    visibleBuildings: new Set(initialBuildings.map(b => b.id))
+    visibleBuildings: new Set(allBuildings.map(b => b.id))
   },
-  metrics: { totalPeople: 200, activeBuildings: initialBuildings.length, totalOccupancy: 0 },
-  environment: { season: 'automne', dayPeriod: 'apresmidi', weekend: false },
+  metrics: { totalPeople: 500 + customPeople.length, activeBuildings: allBuildings.length, totalOccupancy: 0 },
+  environment: { season: 'automne', dayPeriod: 'apresmidi', weekend: false, gameTime: 14 },
   scenario: { investmentAI: 0.7, investmentHumanities: 0.3, llmAgents: false },
   // timeseries buffers
   timeseries: [] as any,
   tsAcc: 0 as any,
   selectedPersonId: null,
   hoveredBuildingId: null,
+  selectedBuildingId: null,
   effects: [],
   departments: [
     { id: 'eco', name: 'Économie', buildingId: 'bus', publications: 0, collaborations: {}, rivalries: {} },
@@ -43,6 +51,7 @@ export const useStore = create<Store>((set, get) => ({
   deptInteractions: [],
   deptFlashes: [],
   news: [],
+  buildingEvents: {},
   agents: initializeAgents(),
 
   applyDirective: (d) => set(state => {
@@ -52,10 +61,25 @@ export const useStore = create<Store>((set, get) => ({
       settings: state.settings,
       environment: state.environment,
       effects: state.effects,
-      news: state.news
+      news: state.news,
+      buildingEvents: state.buildingEvents
     }, get)
 
-    return result
+    // Mettre à jour les métriques si le nombre de personnes a changé
+    const updatedMetrics = result.people 
+      ? { ...state.metrics, totalPeople: result.people.length }
+      : state.metrics
+
+    // Mettre à jour visibleBuildings si de nouveaux bâtiments ont été ajoutés
+    if (result.buildings && result.settings?.visibleBuildings) {
+      const allBuildingIds = new Set(result.buildings.map(b => b.id))
+      const updatedVisible = new Set(
+        [...result.settings.visibleBuildings].filter(id => allBuildingIds.has(id))
+      )
+      result.settings.visibleBuildings = updatedVisible
+    }
+
+    return { ...result, metrics: updatedMetrics }
   }),
 
   tick: (dt) => set(state => {
@@ -82,6 +106,17 @@ export const useStore = create<Store>((set, get) => ({
       state.news
     )
 
+    // Update Game Time (1 real sec = 10 game mins)
+    const timeStep = (dt * 10) / 60
+    state.environment.gameTime = (state.environment.gameTime + timeStep) % 24
+
+    // Update Agents (LangGraph Logic)
+    for (const p of state.people) {
+        const decision = updateAgentBehavior(p, state.environment.gameTime, state.buildings, state.environment)
+        if (decision.targetId) p.targetBuildingId = decision.targetId
+        if (decision.mood) p.state.mood = decision.mood as any
+    }
+
     // Apply environment influences
     for (const b of state.buildings) {
       const target = computeEnvActivityTarget(b, state.environment)
@@ -100,7 +135,17 @@ export const useStore = create<Store>((set, get) => ({
           b.position[2] + (Math.random() - 0.5) * b.size[2]
         ]
         const id = state.people.length ? Math.max(...state.people.map(p => p.id)) + 1 : 0
-        state.people.push({ id, position: pos, targetBuildingId: b.id, speed: 0.8 + Math.random() * 0.6, name: randomName(Math.random) })
+        state.people.push({ 
+            id, 
+            position: pos, 
+            targetBuildingId: b.id, 
+            speed: 0.8 + Math.random() * 0.6, 
+            name: randomName(Math.random),
+            role: 'visitor',
+            traits: { introversion: Math.random(), punctuality: Math.random(), energy: 1 },
+            schedule: [{ time: 9, activity: 'leisure' }, { time: 22, activity: 'sleep', targetId: 'res-family' }],
+            state: { currentActivity: 'idle', mood: 'neutral', history: [] }
+        })
       }
     } else if (state.people.length > targetPop) {
       const toRemove = Math.min(state.people.length - targetPop, Math.ceil(20 * dt))
@@ -133,7 +178,14 @@ export const useStore = create<Store>((set, get) => ({
 
     // Move people towards target buildings
     for (const p of nextPeople) {
-      const target = buildings.find(b => b.id === p.targetBuildingId)!
+      let target = buildings.find(b => b.id === p.targetBuildingId)
+      
+      // Safety check: if target building is missing (e.g. deleted), assign a new one
+      if (!target) {
+        target = buildings[Math.floor(Math.random() * buildings.length)]
+        p.targetBuildingId = target.id
+      }
+
       const dx = target.position[0] - p.position[0]
       const dz = target.position[2] - p.position[2]
       const dist = Math.hypot(dx, dz)
@@ -208,6 +260,7 @@ export const useStore = create<Store>((set, get) => ({
   setSelectedPerson: (id) => set({ selectedPersonId: id })
   ,
   setHoveredBuilding: (id) => set({ hoveredBuildingId: id }),
+  setSelectedBuilding: (id) => set({ selectedBuildingId: id }),
   setScenario: (s) => set(state => ({ scenario: { ...state.scenario, ...s } })),
   applyAgentActions: (acts) => set(state => {
     const newNews = [...state.news]

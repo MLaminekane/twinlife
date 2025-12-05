@@ -1,9 +1,12 @@
 import * as THREE from 'three'
 import { useMemo, useRef, useState } from 'react'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useFrame, useThree, ThreeEvent } from '@react-three/fiber'
 import { Building, useStore } from '../state/store'
 
-export function BuildingMesh({ building }: { building: Building }) {
+export function BuildingMesh({ building, onClick }: { 
+  building: Building
+  onClick?: (e: ThreeEvent<MouseEvent>) => void
+}) {
   const shadows = useStore(s => s.settings.shadows)
   const { camera } = useThree()
   const [lod, setLod] = useState(0)
@@ -79,7 +82,12 @@ export function BuildingMesh({ building }: { building: Building }) {
   return (
     <group ref={groupRef}>
       {/* Main building box */}
-      <mesh castShadow={shadows} receiveShadow position={[0, building.size[1] / 2, 0]}>
+      <mesh 
+        castShadow={shadows} 
+        receiveShadow 
+        position={[0, building.size[1] / 2, 0]}
+        onClick={onClick}
+      >
         <boxGeometry args={building.size} />
         <meshStandardMaterial color={color} roughness={0.8} metalness={0.1} />
       </mesh>

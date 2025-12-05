@@ -5,6 +5,7 @@ import { useRef, useMemo } from 'react'
 import { useStore } from '../state/store'
 import { InstancedPeople } from './InstancedPeople'
 import { PeopleLabels } from './PeopleLabels'
+import { PeopleThoughts } from './PeopleThoughts'
 import { Zones } from './Zones'
 import { ActivityBars } from './ActivityBars'
 import { Roads } from './Roads'
@@ -17,6 +18,7 @@ export function CampusScene() {
   const labels = useStore(s => s.settings.labels)
   const tick = useStore(s => s.tick)
   const setHovered = useStore(s => s.setHoveredBuilding)
+  const setSelectedBuilding = useStore(s => s.setSelectedBuilding)
   const hoveredId = useStore(s => s.hoveredBuildingId)
 
   // Animation loop ticks simulation
@@ -49,6 +51,7 @@ export function CampusScene() {
           position={[b.position[0], 0, b.position[2]]}
           onPointerOver={(e) => { e.stopPropagation(); setHovered(b.id) }}
           onPointerOut={(e) => { e.stopPropagation(); setHovered(null) }}
+          onClick={(e) => { e.stopPropagation(); setSelectedBuilding(b.id) }}
         >
           <BuildingMesh building={b} />
           {labels && (
@@ -77,6 +80,7 @@ export function CampusScene() {
 
       {/* People */}
       <InstancedPeople />
+      <PeopleThoughts />
       <PeopleLabels />
     </group>
   )

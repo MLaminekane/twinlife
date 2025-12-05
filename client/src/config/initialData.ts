@@ -46,14 +46,65 @@ export const initialBuildings: Building[] = [
 export function initPeople(count: number, buildings: Building[]): Person[] {
     const rand = seededRandom(42)
     const arr: Person[] = []
+    
+    const residential = buildings.filter(b => b.id.startsWith('res') || b.zone === 'residential')
+    const workplaces = buildings.filter(b => b.zone === 'downtown' || b.zone === 'commercial')
+    const campus = buildings.filter(b => b.zone === 'campus')
+    const food = buildings.filter(b => b.id === 'cafe' || b.id === 'restaurant' || b.id === 'mall')
+
     for (let i = 0; i < count; i++) {
+        const roleVal = rand()
+        const role = roleVal < 0.6 ? 'student' : (roleVal < 0.9 ? 'employee' : 'visitor')
+        
+        // Assign home and work
+        const home = residential[Math.floor(rand() * residential.length)] || buildings[0]
+        const work = role === 'student' 
+            ? campus[Math.floor(rand() * campus.length)] 
+            : workplaces[Math.floor(rand() * workplaces.length)]
+        
+        // Generate Schedule
+        const schedule = []
+        if (role === 'student') {
+            schedule.push({ time: 8, activity: 'study', targetId: work?.id })
+            schedule.push({ time: 12, activity: 'eat', targetId: food[Math.floor(rand() * food.length)]?.id })
+            schedule.push({ time: 13, activity: 'study', targetId: work?.id })
+            schedule.push({ time: 17, activity: 'leisure' }) // Dynamic target
+            schedule.push({ time: 22, activity: 'sleep', targetId: home?.id })
+        } else {
+            schedule.push({ time: 9, activity: 'work', targetId: work?.id })
+            schedule.push({ time: 12, activity: 'eat', targetId: food[Math.floor(rand() * food.length)]?.id })
+            schedule.push({ time: 13, activity: 'work', targetId: work?.id })
+            schedule.push({ time: 18, activity: 'leisure' })
+            schedule.push({ time: 23, activity: 'sleep', targetId: home?.id })
+        }
+
         const b = buildings[Math.floor(rand() * buildings.length)]
         const pos: [number, number, number] = [
             b.position[0] + (rand() - 0.5) * b.size[0],
             0.1,
             b.position[2] + (rand() - 0.5) * b.size[2]
         ]
-        arr.push({ id: i, position: pos, targetBuildingId: b.id, speed: 0.8 + rand() * 0.6, name: randomName(rand) })
+        
+        arr.push({ 
+            id: i, 
+            position: pos, 
+            targetBuildingId: b.id, 
+            speed: 0.8 + rand() * 0.6, 
+            name: randomName(rand),
+            role: role as any,
+            workplace: work?.id,
+            traits: {
+                introversion: rand(),
+                punctuality: 0.5 + rand() * 0.5,
+                energy: 1.0
+            },
+            schedule: schedule as any,
+            state: {
+                currentActivity: 'idle',
+                mood: 'neutral',
+                history: []
+            }
+        })
     }
     return arr
 }
