@@ -2,27 +2,15 @@
  * Web Worker for offloading simulation calculations
  * Keeps the main thread free for rendering
  */
-
-import { tickSimulation, applyEnvironmentEffects } from './simulation'
-import type { Building, Person, Environment } from '../state/store'
-
-interface WorkerState {
-    buildings: Building[]
-    people: Person[]
-    environment: Environment
-}
-
-let state: WorkerState = {
+import { tickSimulation, applyEnvironmentEffects } from './simulation';
+let state = {
     buildings: [],
     people: [],
-    // Initial state must match Environment type
     environment: { season: 'automne', dayPeriod: 'apresmidi', weekend: false, gameTime: 14 }
-}
-
+};
 // Handle messages from main thread
-self.onmessage = (e: MessageEvent) => {
-    const { type, payload } = e.data
-
+self.onmessage = (e) => {
+    const { type, payload } = e.data;
     switch (type) {
         case 'init':
             // Initialize worker state
@@ -30,31 +18,22 @@ self.onmessage = (e: MessageEvent) => {
                 buildings: payload.buildings,
                 people: payload.people,
                 environment: payload.environment
-            }
-            self.postMessage({ type: 'ready' })
-            break
-
+            };
+            self.postMessage({ type: 'ready' });
+            break;
         case 'tick':
             // Run simulation tick
-            const { dt, speed, environment } = payload
-
+            const { dt, speed, environment } = payload;
             // Update environment if provided
             if (environment) {
-                state.environment = environment
+                state.environment = environment;
             }
-
             // Apply environment effects to buildings
-            state.buildings = applyEnvironmentEffects(state.buildings, state.environment, dt)
-
+            state.buildings = applyEnvironmentEffects(state.buildings, state.environment, dt);
             // Tick simulation (move people, update occupancy)
-            const result = tickSimulation(
-                { ...state, dt },
-                speed
-            )
-
-            state.buildings = result.buildings
-            state.people = result.people
-
+            const result = tickSimulation({ ...state, dt }, speed);
+            state.buildings = result.buildings;
+            state.people = result.people;
             // Send results back to main thread
             self.postMessage({
                 type: 'tick_result',
@@ -62,17 +41,18 @@ self.onmessage = (e: MessageEvent) => {
                     buildings: state.buildings,
                     people: state.people
                 }
-            })
-            break
-
+            });
+            break;
         case 'update_state':
             // Update specific parts of state (e.g., after directive)
-            if (payload.buildings) state.buildings = payload.buildings
-            if (payload.people) state.people = payload.people
-            if (payload.environment) state.environment = payload.environment
-            self.postMessage({ type: 'state_updated' })
-            break
-
+            if (payload.buildings)
+                state.buildings = payload.buildings;
+            if (payload.people)
+                state.people = payload.people;
+            if (payload.environment)
+                state.environment = payload.environment;
+            self.postMessage({ type: 'state_updated' });
+            break;
         case 'get_state':
             // Return current state
             self.postMessage({
@@ -82,13 +62,11 @@ self.onmessage = (e: MessageEvent) => {
                     people: state.people,
                     environment: state.environment
                 }
-            })
-            break
-
+            });
+            break;
         default:
-            console.warn('Unknown worker message type:', type)
+            console.warn('Unknown worker message type:', type);
     }
-}
-
+};
 // Signal that worker is ready
-self.postMessage({ type: 'worker_ready' })
+self.postMessage({ type: 'worker_ready' });

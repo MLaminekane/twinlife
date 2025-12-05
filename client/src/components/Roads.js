@@ -1,0 +1,9 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { Text } from '@react-three/drei';
+function RoadSegment({ length, width, position, rotation = 0, name }) {
+    const markingsCount = Math.floor(length / 2);
+    return (_jsxs("group", { position: position, rotation: [0, rotation, 0], children: [_jsxs("mesh", { "rotation-x": -Math.PI / 2, position: [0, 0.001, 0], receiveShadow: true, children: [_jsx("planeGeometry", { args: [length, width] }), _jsx("meshStandardMaterial", { color: "#1e293b", roughness: 0.8 })] }), _jsxs("mesh", { "rotation-x": -Math.PI / 2, position: [0, 0.002, width / 2 + 0.2], children: [_jsx("planeGeometry", { args: [length, 0.4] }), _jsx("meshStandardMaterial", { color: "#64748b", roughness: 0.9 })] }), _jsxs("mesh", { "rotation-x": -Math.PI / 2, position: [0, 0.002, -width / 2 - 0.2], children: [_jsx("planeGeometry", { args: [length, 0.4] }), _jsx("meshStandardMaterial", { color: "#64748b", roughness: 0.9 })] }), Array.from({ length: markingsCount }).map((_, i) => (_jsxs("mesh", { "rotation-x": -Math.PI / 2, position: [-length / 2 + 1 + i * 2, 0.003, 0], children: [_jsx("planeGeometry", { args: [1, 0.1] }), _jsx("meshStandardMaterial", { color: "#ffffff", opacity: 0.6, transparent: true })] }, i))), name && (_jsx(Text, { position: [0, 0.02, 0], fontSize: width * 0.4, color: "#94a3b8", anchorX: "center", anchorY: "middle", "rotation-x": -Math.PI / 2, fillOpacity: 0.5, children: name }))] }));
+}
+export function Roads() {
+    return (_jsxs("group", { children: [_jsx(RoadSegment, { length: 80, width: 2.5, position: [0, 0, -2], name: "Avenue Principale" }), _jsx(RoadSegment, { length: 80, width: 1.8, position: [-6, 0, 0], rotation: Math.PI / 2, name: "All\u00E9e Ouest" }), _jsx(RoadSegment, { length: 60, width: 1.8, position: [15, 0, 0], rotation: Math.PI / 2, name: "Promenade Est" }), _jsx(RoadSegment, { length: 25, width: 1.5, position: [4.5, 0, -15], name: "Chemin Nord" })] }));
+}
