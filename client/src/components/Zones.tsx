@@ -21,20 +21,21 @@ function RoundedQuad({ pos, color, w=36, h=36, r=4, alpha=0.06 }: { pos: [number
   return (
     <mesh rotation-x={-Math.PI/2} position={pos}>
       <shapeGeometry args={[shape]} />
-      <meshBasicMaterial color={color} transparent opacity={alpha} />
+      <meshBasicMaterial color={color} transparent opacity={alpha} depthWrite={false} />
     </mesh>
   )
 }
 
 export function Zones() {
   const size = 40
+  const y = 0.05
   return (
     <group>
       {/* Rounded quadrants with soft tints */}
-      <RoundedQuad pos={[-size/2, 0.001,  size/2]} color="#16a34a" />
-      <RoundedQuad pos={[ size/2, 0.001,  size/2]} color="#2563eb" />
-      <RoundedQuad pos={[-size/2, 0.001, -size/2]} color="#b45309" />
-      <RoundedQuad pos={[ size/2, 0.001, -size/2]} color="#a21caf" />
+      <RoundedQuad pos={[-size/2, y,  size/2]} color="#16a34a" />
+      <RoundedQuad pos={[ size/2, y,  size/2]} color="#2563eb" />
+      <RoundedQuad pos={[-size/2, y, -size/2]} color="#b45309" />
+      <RoundedQuad pos={[ size/2, y, -size/2]} color="#a21caf" />
 
     </group>
   )

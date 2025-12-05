@@ -4,8 +4,8 @@ import { useFrame } from '@react-three/fiber'
 import { useStore } from '../state/store'
 
 /**
- * Alternative rendering using sprites (2D icons that always face camera)
- * Better for top-down views or when you want emoji/icon style people
+ * Rendu alternatif utilisant des sprites (icônes 2D qui font toujours face à la caméra)
+ * Mieux pour les vues de dessus ou quand on veut un style emoji/icône pour les gens
  */
 export function PeopleSprites() {
   const people = useStore(s => s.people)
@@ -13,25 +13,25 @@ export function PeopleSprites() {
   const tempObject = useMemo(() => new THREE.Object3D(), [])
   const tempColor = useMemo(() => new THREE.Color(), [])
 
-  // Create a plane geometry (will always face camera with sprite material)
+  // Créer une géométrie plane (fera toujours face à la caméra avec le matériau sprite)
   const geometry = useMemo(() => new THREE.PlaneGeometry(0.3, 0.3), [])
 
-  // Create sprite-like material with a simple circle texture
+  // Créer un matériau de type sprite avec une texture de cercle simple
   const material = useMemo(() => {
-    // Create a canvas texture with a person icon
+    // Créer une texture canvas avec une icône de personne
     const canvas = document.createElement('canvas')
     canvas.width = 64
     canvas.height = 64
     const ctx = canvas.getContext('2d')!
     
-    // Draw a simple person icon (circle head + body)
+    // Dessiner une icône de personne simple (tête ronde + corps)
     ctx.fillStyle = '#60a5fa'
     ctx.beginPath()
-    ctx.arc(32, 20, 12, 0, Math.PI * 2) // Head
+    ctx.arc(32, 20, 12, 0, Math.PI * 2) // Tête
     ctx.fill()
-    ctx.fillRect(26, 32, 12, 20) // Body
-    ctx.fillRect(20, 40, 8, 12) // Left leg
-    ctx.fillRect(36, 40, 8, 12) // Right leg
+    ctx.fillRect(26, 32, 12, 20) // Corps
+    ctx.fillRect(20, 40, 8, 12) // Jambe gauche
+    ctx.fillRect(36, 40, 8, 12) // Jambe droite
     
     const texture = new THREE.CanvasTexture(canvas)
     
@@ -52,17 +52,17 @@ export function PeopleSprites() {
       
       tempObject.position.set(
         person.position[0],
-        person.position[1] + 0.15, // Slightly elevated
+        person.position[1] + 0.15, // Légèrement surélevé
         person.position[2]
       )
       
-      // Make sprite face camera (billboard effect)
+      // Faire en sorte que le sprite fasse face à la caméra (effet billboard)
       tempObject.quaternion.copy(camera.quaternion)
       
       tempObject.updateMatrix()
       mesh.setMatrixAt(i, tempObject.matrix)
       
-      // Color by gender
+      // Couleur selon le genre
       if (person.gender === 'male') {
         tempColor.setHex(0x60a5fa)
       } else if (person.gender === 'female') {

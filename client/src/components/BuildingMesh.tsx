@@ -12,8 +12,9 @@ export function BuildingMesh({ building, onClick }: {
   const [lod, setLod] = useState(0)
   const groupRef = useRef<THREE.Group>(null)
 
-  const color = useMemo(() => new THREE.Color('#1e293b'), [])
-  const emissive = useMemo(() => new THREE.Color('#60a5fa'), [])
+  const isEco = building.id === 'bus'
+  const color = useMemo(() => new THREE.Color(isEco ? '#0f172a' : '#1e293b'), [isEco])
+  const emissive = useMemo(() => new THREE.Color(isEco ? '#10b981' : '#60a5fa'), [isEco])
 
   // LOD 0: Detailed windows (individual meshes)
   const windowsDetailed = useMemo(() => {
@@ -125,6 +126,14 @@ export function BuildingMesh({ building, onClick }: {
           />
         </mesh>
       )}
+      {/* Special Wall Street Ticker Strip for Eco Building */}
+      {isEco && (
+        <mesh position={[0, building.size[1] - 0.5, 0]}>
+          <boxGeometry args={[building.size[0] + 0.2, 0.4, building.size[2] + 0.2]} />
+          <meshStandardMaterial color="#064e3b" emissive="#10b981" emissiveIntensity={0.8} />
+        </mesh>
+      )}
+
     </group>
   )
 }

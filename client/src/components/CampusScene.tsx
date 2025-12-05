@@ -21,6 +21,7 @@ export function CampusScene() {
   const setHovered = useStore(s => s.setHoveredBuilding)
   const setSelectedBuilding = useStore(s => s.setSelectedBuilding)
   const hoveredId = useStore(s => s.hoveredBuildingId)
+  const selectedBuildingId = useStore(s => s.selectedBuildingId)
 
   // Animation loop ticks simulation
   useFrame((_, dt) => tick(Math.min(0.05, dt)))

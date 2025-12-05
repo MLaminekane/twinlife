@@ -15,7 +15,7 @@ interface WorkerState {
 let state: WorkerState = {
     buildings: [],
     people: [],
-    environment: { season: 'automne', dayPeriod: 'apresmidi', weekend: false }
+    environment: { season: 'automne', dayPeriod: 'apresmidi', weekend: false, gameTime: 14 }
 }
 
 // Handle messages from main thread

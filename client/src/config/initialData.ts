@@ -6,7 +6,7 @@ export const initialBuildings: Building[] = [
     { id: 'sci', name: 'Sciences', position: [-22, 2, 15], size: [5, 5, 6], activity: 0.5, occupancy: 0 },
     { id: 'eng', name: 'Ingénierie', position: [-12, 2, 15], size: [5, 5, 5], activity: 0.5, occupancy: 0 },
     { id: 'med', name: 'Médecine', position: [-22, 2, 7], size: [6, 5, 5], activity: 0.5, occupancy: 0 },
-    { id: 'bus', name: 'Économie', position: [-12, 2, 7], size: [5, 5, 5], activity: 0.5, occupancy: 0 },
+    { id: 'bus', name: 'Économie', position: [-12, 2, 7], size: [5, 5, 5], activity: 0.9, occupancy: 0 },
     { id: 'art', name: 'Arts', position: [-28, 2, 11], size: [4, 4, 5], activity: 0.5, occupancy: 0 },
     { id: 'law', name: 'Droit', position: [-10, 2, 32], size: [4.5, 4.5, 4], activity: 0.5, occupancy: 0 },
     { id: 'lib', name: 'Bibliothèque', position: [-18, 2, 22], size: [6, 5, 5], activity: 0.5, occupancy: 0 },
@@ -58,9 +58,15 @@ export function initPeople(count: number, buildings: Building[]): Person[] {
         
         // Assign home and work
         const home = residential[Math.floor(rand() * residential.length)] || buildings[0]
-        const work = role === 'student' 
-            ? campus[Math.floor(rand() * campus.length)] 
-            : workplaces[Math.floor(rand() * workplaces.length)]
+        
+        let work;
+        if (role === 'student') {
+             // 40% chance to be in Economics (Wall Street vibe)
+             if (rand() < 0.4) work = buildings.find(b => b.id === 'bus')
+             else work = campus[Math.floor(rand() * campus.length)]
+        } else {
+             work = workplaces[Math.floor(rand() * workplaces.length)]
+        }
         
         // Generate Schedule
         const schedule = []

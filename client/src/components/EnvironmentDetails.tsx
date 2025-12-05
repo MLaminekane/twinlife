@@ -3,20 +3,27 @@ import { Instance, Instances } from '@react-three/drei'
 import * as THREE from 'three'
 
 // Simple low-poly tree geometry
-function TreeInstances({ count = 50, area = 40 }) {
+function TreeInstances({ count = 50, area = 40, offset = [0, 0] }) {
+  const [offsetX, offsetZ] = offset
   const trees = useMemo(() => {
     const temp = []
     for (let i = 0; i < count; i++) {
-      const x = (Math.random() - 0.5) * area * 2
-      const z = (Math.random() - 0.5) * area * 2
-      // Avoid placing trees on the main roads (approximate exclusion zones)
-      if (Math.abs(z + 2) < 2 || Math.abs(x + 6) < 2) continue
+      const x = (Math.random() - 0.5) * area * 2 + offsetX
+      const z = (Math.random() - 0.5) * area * 2 + offsetZ
       
+      // Avoid placing trees on the main roads (approximate exclusion zones)
+      // Main Avenue: z approx -2, width ~4
+      // West Alley: x approx -6, width ~4
+      if (Math.abs(z + 2) < 3 || Math.abs(x + 6) < 3) continue
+      
+      // Avoid river (approx z = -25)
+      if (Math.abs(z + 25) < 4) continue
+
       const scale = 0.5 + Math.random() * 0.5
       temp.push({ position: [x, 0, z], scale })
     }
     return temp
-  }, [count, area])
+  }, [count, area, offsetX, offsetZ])
 
   return (
     <group>
@@ -58,6 +65,53 @@ function TreeInstances({ count = 50, area = 40 }) {
           />
         ))}
       </Instances>
+    </group>
+  )
+}
+
+function River() {
+  // A simple winding river mesh
+  const curve = useMemo(() => {
+    return new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-50, 0, -25),
+      new THREE.Vector3(-20, 0, -22),
+      new THREE.Vector3(0, 0, -28),
+      new THREE.Vector3(30, 0, -24),
+      new THREE.Vector3(50, 0, -26),
+    ])
+  }, [])
+
+  const geometry = useMemo(() => {
+    return new THREE.TubeGeometry(curve, 20, 1.5, 8, false)
+  }, [curve])
+
+  return (
+    <group>
+      <mesh geometry={geometry} position={[0, -0.3, 0]} scale={[1, 0.3, 1]} receiveShadow>
+        <meshStandardMaterial color="#3b82f6" roughness={0.2} metalness={0.1} />
+      </mesh>
+    </group>
+  )
+}
+
+function Mountains() {
+  const mountains = useMemo(() => {
+    return [
+      { pos: [-40, 0, -40], scale: 15, color: '#64748b' },
+      { pos: [-25, 0, -45], scale: 12, color: '#475569' },
+      { pos: [35, 0, -42], scale: 18, color: '#64748b' },
+      { pos: [50, 0, -35], scale: 14, color: '#475569' },
+    ]
+  }, [])
+
+  return (
+    <group>
+      {mountains.map((m, i) => (
+        <mesh key={i} position={[m.pos[0], m.scale * 0.4, m.pos[2]]}>
+          <coneGeometry args={[m.scale, m.scale, 5]} />
+          <meshStandardMaterial color={m.color} flatShading />
+        </mesh>
+      ))}
     </group>
   )
 }
@@ -144,7 +198,15 @@ function Benches() {
 export function EnvironmentDetails() {
   return (
     <group>
-      <TreeInstances count={80} />
+      {/* Urban trees scattered around */}
+      <TreeInstances count={60} />
+      
+      {/* Dense forests near the mountains */}
+      <TreeInstances count={80} area={15} offset={[-35, -35]} />
+      <TreeInstances count={80} area={15} offset={[35, -35]} />
+
+      <River />
+      <Mountains />
       <StreetLamps />
       <Benches />
     </group>
