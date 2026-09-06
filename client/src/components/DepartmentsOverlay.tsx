@@ -26,7 +26,7 @@ export function DepartmentsOverlay() {
 
   return (
     <group>
-      {/* Collaboration / Rivalry lines */}
+      {/* Lignes de collaboration / rivalité */}
       {interactions.map((e, idx) => {
         const aB = idToBuilding(e.from)
         const bB = idToBuilding(e.to)
@@ -41,7 +41,7 @@ export function DepartmentsOverlay() {
         )
       })}
 
-      {/* Publish flashes */}
+      {/* Flashs de publication */}
       {flashes.map((f, idx) => {
         const p = centerOf(f.buildingId)
         const alpha = Math.max(0, Math.min(1, f.remaining / 2.0))

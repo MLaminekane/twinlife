@@ -1,0 +1,58 @@
+.command-center { display: flex; flex-direction: column; min-height: 0; height: 100%; background: #131a1b; color: #eff3ee; font-size: 12px; }
+.command-center button, .command-center textarea { font-family: inherit; }
+.command-header { display: flex; align-items: center; gap: 11px; padding: 22px 20px 18px; border-bottom: 1px solid #ffffff0d; }
+.command-header-icon { width: 34px; height: 34px; display: grid; place-items: center; background: #b9f57910; color: #b9f579; border: 1px solid #b9f57924; border-radius: 11px; flex-shrink: 0; }
+.command-header-title { flex: 1; }
+.command-header-title h2 { font-size: 13px; font-weight: 550; margin: 0 0 4px; letter-spacing: -.15px; }
+.command-header-title span { color: #8a9998; font-size: 10px; }
+.command-center .command-icon-button { display: grid; place-items: center; width: 26px; height: 26px; flex-shrink: 0; border: 0; border-radius: 6px; color: #9aa9a6; background: transparent; cursor: pointer; }
+.command-center .command-icon-button:hover { color: #fff; background: #ffffff09; }
+.command-service { display: flex; align-items: center; gap: 7px; padding: 12px 20px; font-size: 9px; color: #94a49e; background: #101718; letter-spacing: .1px; }
+.command-service i { width: 5px; height: 5px; flex: 0 0 5px; border-radius: 50%; background: #b9f579; box-shadow: 0 0 7px #b9f57925; }
+.command-service.is-offline { color: #d8b99a; }
+.command-service.is-offline i { background: #d8b99a; }
+.command-scroll { flex: 1; min-height: 0; overflow: auto; padding: 0 20px 14px; scrollbar-width: thin; scrollbar-color: #344441 transparent; }
+.command-intro { padding: 32px 0 22px; }
+.command-orbit { width: 58px; height: 58px; display: grid; place-items: center; color: #b9f579; border: 1px solid #b9f57920; border-radius: 18px; margin-bottom: 22px; background: radial-gradient(ellipse at 15% 0, #b9f57919, transparent 80%); transform: rotate(-5deg); box-shadow: 0 8px 30px #00000016; }
+.command-orbit svg { transform: rotate(5deg); }
+.command-intro h3 { font-weight: 500; font-size: 23px; letter-spacing: -.7px; line-height: 1.35; margin: 0 0 12px; }
+.command-intro h3 span { color: #b9f579; }
+.command-intro p { margin: 0; color: #8c9d97; line-height: 1.8; font-size: 11px; max-width: 260px; }
+.command-suggestions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-bottom: 24px; }
+.command-suggestions button { display: flex; align-items: center; justify-content: space-between; gap: 4px; padding: 11px 9px; text-align: left; border: 1px solid #ffffff0d; border-radius: 7px; color: #c0ccc6; background: #ffffff03; font-size: 9px; cursor: pointer; line-height: 1.4; transition: background .2s, border-color .2s; }
+.command-suggestions button svg { color: #75897e; flex-shrink: 0; }
+.command-suggestions button:hover { background: #b9f57909; border-color: #b9f57935; }
+.command-center button:disabled { opacity: .4; cursor: not-allowed; }
+.command-center button:focus-visible, .command-center summary:focus-visible { outline: 2px solid #b9f579; outline-offset: 3px; }
+.command-history-header { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #ffffff0d; padding: 12px 0; color: #7f9388; font-size: 9px; text-transform: uppercase; letter-spacing: .8px; }
+.command-entry { margin-bottom: 20px; }
+.command-request { display: flex; align-items: flex-start; gap: 8px; color: #bbc8c1; }
+.command-request svg { margin-top: 3px; flex-shrink: 0; color: #728c7e; }
+.command-request p { flex: 1; font-size: 11px; margin: 0; line-height: 1.65; overflow-wrap: anywhere; }
+.command-request time { font-size: 8px; color: #697d72; margin-top: 4px; }
+.command-result { display: flex; gap: 9px; margin-top: 9px; border: 1px solid #b9f57910; border-radius: 8px; padding: 11px; background: #b9f57905; color: #a9b9ad; font-size: 10px; line-height: 1.7; }
+.command-result > svg { flex-shrink: 0; color: #b9f579; margin-top: 2px; }
+.command-result p { margin: 0; }
+.command-result strong { color: #d4e1d7; font-size: 10px; font-weight: 500; }
+.command-result ul { margin: 4px 0 0; padding-left: 13px; }
+.command-result li { padding-bottom: 2px; overflow-wrap: anywhere; }
+.command-result details { margin-top: 5px; }
+.command-result summary { color: #b9f579; cursor: pointer; }
+.command-result.is-error { background: #dbab7f08; border-color: #dbab7f20; color: #d9b89b; }
+.command-result.is-error > svg { color: #d9b89b; }
+.command-pending { display: flex; align-items: center; gap: 10px; color: #b9f579; padding: 9px 0 16px; font-size: 10px; }
+.command-composer { padding: 16px 20px 18px; border-top: 1px solid #ffffff0d; background: #131a1b; }
+.command-input-label { display: block; font-size: 9px; color: #a3b4a9; letter-spacing: .25px; margin-bottom: 9px; }
+.command-input-wrap { background: #0e1515; border: 1px solid #ffffff12; border-radius: 10px; overflow: hidden; transition: border-color .2s; }
+.command-input-wrap:focus-within { border-color: #b9f57965; box-shadow: 0 0 0 2px #b9f57908; }
+.command-center textarea { display: block; width: 100%; height: 70px; min-height: 70px; max-height: 160px; resize: vertical; background: transparent; color: #e1eae3; border: 0; padding: 13px; font-size: 11px; line-height: 1.7; outline: none; border-radius: 0; }
+.command-center textarea::placeholder { color: #62766b; }
+.command-input-footer { display: flex; align-items: center; justify-content: space-between; padding: 5px 8px 8px 13px; }
+.command-input-footer > span { color: #697d71; font-size: 8px; }
+.command-input-footer button { width: 30px; height: 30px; display: grid; place-items: center; background: #b9f579; color: #172214; border: 0; border-radius: 7px; cursor: pointer; transition: filter .2s; }
+.command-input-footer button:hover { filter: brightness(1.1); }
+.command-footnote { color: #738478; font-size: 8px; line-height: 1.7; margin: 10px 0 0; }
+.command-spin { animation: command-spin 1s linear infinite; }
+@keyframes command-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .command-center *, .command-center *::before { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+@media (max-height: 760px) { .command-intro { padding-top: 22px; } .command-orbit { display: none; } .command-intro h3 { font-size: 21px; } }

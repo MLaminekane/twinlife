@@ -5,8 +5,8 @@ import { useGLTF } from '@react-three/drei'
 import { useStore } from '../state/store'
 
 /**
- * Advanced rendering using custom 3D models
- * Place a .glb/.gltf model in public/models/person.glb
+ * Rendu avancé utilisant des modèles 3D personnalisés
+ * Placer un modèle .glb/.gltf dans public/models/person.glb
  */
 export function PeopleModels() {
   const people = useStore(s => s.people)
@@ -16,23 +16,23 @@ export function PeopleModels() {
   const tempObject = useMemo(() => new THREE.Object3D(), [])
   const tempColor = useMemo(() => new THREE.Color(), [])
   
-  // Load 3D model (you need to add person.glb to your public/models folder)
-  // Alternative: use a simple custom geometry
+  // Charger le modèle 3D (vous devez ajouter person.glb dans votre dossier public/models)
+  // Alternative : utiliser une géométrie personnalisée simple
   const geometry = useMemo(() => {
-    // Create a simple humanoid shape with boxes
+    // Créer une forme humanoïde simple avec des boîtes
     const group = new THREE.Group()
     
-    // Head
+    // Tête
     const head = new THREE.BoxGeometry(0.1, 0.1, 0.1)
     const headMesh = new THREE.Mesh(head)
     headMesh.position.y = 0.25
     
-    // Body
+    // Corps
     const body = new THREE.BoxGeometry(0.12, 0.2, 0.08)
     const bodyMesh = new THREE.Mesh(body)
     bodyMesh.position.y = 0.1
     
-    // Merge geometries for better performance
+    // Fusionner les géométries pour de meilleures performances
     const mergedGeometry = new THREE.BufferGeometry()
     const geometries = [head, body].map((geo, i) => {
       const mesh = i === 0 ? headMesh : bodyMesh
@@ -41,7 +41,7 @@ export function PeopleModels() {
       return cloned
     })
     
-    // Or use a simple cone/capsule as humanoid
+    // Ou utiliser un cône/capsule simple comme humanoïde
     return new THREE.CapsuleGeometry(0.06, 0.25, 4, 8)
   }, [])
 
@@ -64,18 +64,18 @@ export function PeopleModels() {
       
       tempObject.position.set(
         person.position[0],
-        person.position[1] + 0.15, // Slight elevation
+        person.position[1] + 0.15, // Légère élévation
         person.position[2]
       )
       
-      // Add rotation based on movement direction (optional)
+      // Ajouter une rotation basée sur la direction du mouvement (optionnel)
       const target = person.targetBuildingId
-      // You could calculate rotation to face target here
+      // On pourrait calculer la rotation pour faire face à la cible ici
       
       tempObject.updateMatrix()
       mesh.setMatrixAt(i, tempObject.matrix)
       
-      // Color variation
+      // Variation de couleur
       if (person.gender === 'male') {
         tempColor.setHex(0x60a5fa)
       } else if (person.gender === 'female') {

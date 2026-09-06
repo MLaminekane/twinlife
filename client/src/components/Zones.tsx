@@ -31,7 +31,7 @@ export function Zones() {
   const y = 0.05
   return (
     <group>
-      {/* Rounded quadrants with soft tints */}
+      {/* Quadrants arrondis avec teintes douces */}
       <RoundedQuad pos={[-size/2, y,  size/2]} color="#16a34a" />
       <RoundedQuad pos={[ size/2, y,  size/2]} color="#2563eb" />
       <RoundedQuad pos={[-size/2, y, -size/2]} color="#b45309" />

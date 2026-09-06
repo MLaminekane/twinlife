@@ -8,7 +8,7 @@ export async function llmDirective(prompt: string): Promise<Directive> {
   const config = getLLMConfig()
   const llmClient = createLLMClient(config)
 
-  // If no AI keys, fallback to rules
+  // Si pas de clé API, utiliser les règles de fallback
   if (!llmClient) {
     console.log('[llmDirective] Pas de clé API, utilisation du fallback')
     return fallbackDirectiveRules(prompt)

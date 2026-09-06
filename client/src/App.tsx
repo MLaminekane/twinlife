@@ -1,77 +1,94 @@
+import { Component, Suspense, type ReactNode } from 'react'
 import { Canvas } from '@react-three/fiber'
-import { OrbitControls, SoftShadows, Text } from '@react-three/drei'
-import { EffectComposer, Bloom, SMAA, SSAO } from '@react-three/postprocessing'
-import { Suspense, useState } from 'react'
+import { OrbitControls } from '@react-three/drei'
+import { Bloom, EffectComposer } from '@react-three/postprocessing'
 import { useStore } from './state/store'
+import { useView } from './state/viewStore'
 import { CampusScene } from './components/CampusScene'
-import { HUD } from './components/HUD'
-import { ControlsPanel } from './components/ControlsPanel'
-import { FocusCamera } from './components/FocusCamera'
-import { AutoTarget } from './components/AutoTarget'
-import { MapView } from './components/MapView'
+import { CityAtmosphere } from './components/CityAtmosphere'
+import { CityCamera } from './components/CityCamera'
+import { ExperienceShell } from './components/ExperienceShell'
 import { AgentLoop } from './components/AgentLoop'
 import { PersistGate } from './components/PersistGate'
-import { LLMPanel } from './components/LLMPanel'
-import { BuildingActivityPanel } from './components/BuildingActivityPanel'
-import { DialogueModal } from './components/DialogueModal'
+import { MiniMap } from './components/MiniMap'
+
+class SceneBoundary extends Component<
+  { children: ReactNode },
+  { failed: boolean }
+> {
+  state = { failed: false }
+  static getDerivedStateFromError() {
+    return { failed: true }
+  }
+  render() {
+    if (this.state.failed)
+      return (
+        <div className="scene-fallback">
+          <MiniMap large />
+          <p>
+            La vue 3D n’est pas disponible dans ce navigateur. Explorez les
+            bâtiments sur le plan.
+          </p>
+          <button onClick={() => window.location.reload()}>
+            Réessayer la 3D
+          </button>
+        </div>
+      )
+    return this.props.children
+  }
+}
 
 export default function App() {
-  const glow = useStore(s => s.settings.glow)
-  const shadows = useStore(s => s.settings.shadows)
-  const [showLLM, setShowLLM] = useState(false)
-
+  const shadows = useStore((s) => s.settings.shadows)
+  const glow = useStore((s) => s.settings.glow)
+  const layer = useView((s) => s.layer)
+  const quality = useView((s) => s.quality)
+  const cinematic = useView((s) => s.cinematic)
   return (
     <div className="app-root">
-      <Canvas shadows={shadows} camera={{ position: [22, 18, 22], fov: 55 }}>
-        <color attach="background" args={[0x0a0e14]} />
-        <ambientLight intensity={0.35} />
-        <directionalLight
-          castShadow={shadows}
-          position={[15, 25, 15]}
-          intensity={1.2}
-          shadow-mapSize-width={2048}
-          shadow-mapSize-height={2048}
-        />
-        {shadows && <SoftShadows size={25} samples={12} focus={0.4} />}
-        <Suspense fallback={null}>
-          <CampusScene />
-        </Suspense>
-        <OrbitControls makeDefault />
-        <FocusCamera />
-  <AutoTarget />
-        {glow && (
-          <EffectComposer>
-            <SMAA />
-            <SSAO intensity={0.3} radius={0.2} luminanceInfluence={0.6} />
-            <Bloom intensity={1.15} luminanceThreshold={0.22} luminanceSmoothing={0.9} radius={0.85} />
-          </EffectComposer>
-        )}
-      </Canvas>
-      <HUD />
-      <DialogueModal />
-  <AgentLoop />
-  <PersistGate />
-      <MapView />
-      <BuildingActivityPanel />
-      <ControlsPanel />
-      
-      {/* Bouton pour ouvrir le panneau LLM */}
-      <button 
-        className="btn"
-        onClick={() => setShowLLM(v => !v)}
-        style={{ 
-          position: 'absolute', 
-          right: showLLM ? 420 : 10, 
-          top: 12, 
-          zIndex: 25,
-          background: showLLM ? '#3b82f6' : '#111827',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
-        }}
-      >
-        🤖 {showLLM ? 'Fermer' : 'Assistant'} LLM
-      </button>
-      
-      {showLLM && <LLMPanel />}
+      <ExperienceShell>
+        <SceneBoundary>
+          <Canvas
+            shadows={shadows}
+            dpr={quality === 'high' ? [1, 1.75] : 1}
+            camera={{ position: [-65, 55, 72], fov: 45, near: 0.1, far: 400 }}
+            gl={{ antialias: true, preserveDrawingBuffer: true }}
+            onPointerMissed={() => {
+              useStore.getState().setSelectedBuilding(null)
+              useStore.getState().setSelectedPerson(null)
+            }}
+          >
+            <Suspense fallback={null}>
+              <CityAtmosphere />
+              <CampusScene layer={layer} />
+            </Suspense>
+            <OrbitControls
+              makeDefault
+              target={[0, 0, 0]}
+              minDistance={5}
+              maxDistance={145}
+              maxPolarAngle={Math.PI * 0.48}
+              enableDamping
+              dampingFactor={0.07}
+              autoRotate={cinematic}
+              autoRotateSpeed={0.45}
+            />
+            <CityCamera />
+            {glow && quality === 'high' && (
+              <EffectComposer multisampling={0}>
+                <Bloom
+                  intensity={0.28}
+                  luminanceThreshold={1.1}
+                  luminanceSmoothing={0.6}
+                  mipmapBlur
+                />
+              </EffectComposer>
+            )}
+          </Canvas>
+        </SceneBoundary>
+      </ExperienceShell>
+      <AgentLoop />
+      <PersistGate />
     </div>
   )
 }

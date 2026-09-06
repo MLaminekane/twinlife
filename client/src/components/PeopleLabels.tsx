@@ -18,25 +18,25 @@ export function PeopleLabels() {
   if (!people.length) { if (target) setTarget(null); return }
     let bestIdx = -1
     let bestScore = Infinity
-  const maxWorldDist = 7.0 // allow a bit more room when zoomed
-  const maxScreenDist = 0.2  // accept slightly off-center
+  const maxWorldDist = 7.0 // permettre un peu plus d'espace quand zoomé
+  const maxScreenDist = 0.2  // accepter légèrement hors centre
 
     for (let i = 0; i < people.length; i++) {
       const p = people[i]
-      // World distance from camera
+      // Distance monde depuis la caméra
       const dx = p.position[0] - camera.position.x
       const dz = p.position[2] - camera.position.z
       const worldDist = Math.hypot(dx, dz)
       if (worldDist > maxWorldDist) continue
-  // In front of camera and near center of screen
+  // Devant la caméra et près du centre de l'écran
       tmp.current.set(p.position[0], p.position[1], p.position[2]).project(camera)
       const ndcX = tmp.current.x
       const ndcY = tmp.current.y
       const ndcZ = tmp.current.z
-      if (ndcZ < 0 || ndcZ > 1) continue // behind or clipped
+      if (ndcZ < 0 || ndcZ > 1) continue // derrière ou clippé
       const screenDist = Math.hypot(ndcX, ndcY)
       if (screenDist > maxScreenDist) continue
-      // Score favors on-center and closer
+      // Le score favorise le centre et la proximité
       const score = screenDist * 2 + worldDist * 0.5
       if (score < bestScore) { bestScore = score; bestIdx = i }
     }
@@ -50,7 +50,7 @@ export function PeopleLabels() {
         lastId.current = p.id
         setTarget({ id: p.id, name: p.name, dist: d })
       }
-      // Position label INSIDE the square (slight vertical lift to avoid z-fighting)
+      // Positionner le label À L'INTÉRIEUR du carré (légère élévation verticale pour éviter le z-fighting)
       up.current.set(0, 1, 0)
       posRef.current.set(p.position[0], p.position[1], p.position[2])
       posRef.current.addScaledVector(up.current, 0.12)
@@ -59,11 +59,11 @@ export function PeopleLabels() {
       lastId.current = null
     }
 
-    // Make the text face the camera if present
+    // Faire face à la caméra si présente
     if (textRef.current) {
       textRef.current.quaternion.copy(camera.quaternion)
       if (target) {
-        // Update position each frame while tracking the moving person
+        // Mettre à jour la position à chaque frame pendant le suivi de la personne en mouvement
         const p = people.find(pp => pp.id === target.id)
         if (p) {
           up.current.set(0, 1, 0)
@@ -76,7 +76,7 @@ export function PeopleLabels() {
   })
 
   if (!target) return null
-  // Scale font with proximity
+  // Adapter la taille de police selon la proximité
   const fontSize = Math.min(0.18, Math.max(0.12, 0.28 - target.dist * 0.01))
 
   return (

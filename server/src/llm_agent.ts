@@ -9,7 +9,7 @@ export async function agentDecideBatch(batch: AgentBatch): Promise<{ actions: Ag
   const config = getLLMConfig()
   const llmClient = createLLMClient(config)
 
-  // If no AI keys, fallback rules per agent
+  // Si pas de clé API, utiliser les règles de fallback par agent
   if (!llmClient) {
     return { actions: batch.agents.map(a => fallbackAgentDecide(a, batch.world)) }
   }

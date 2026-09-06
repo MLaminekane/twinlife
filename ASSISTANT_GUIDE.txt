@@ -1,0 +1,51 @@
+TWINLIFE STUDIO — GUIDE DES FICHIERS
+
+Lancement : npm ci puis npm run dev, depuis la racine.
+Tests : npm test (client + serveur). Build : npm run build.
+Les sources de référence du client sont les .ts/.tsx. Ne pas régénérer les anciens .js dans client/src.
+
+INTERFACE ET EXPLORATION
+- client/src/App.tsx : Canvas, post-traitement, frontière d’erreur et montage Studio.
+- client/src/components/ExperienceShell.tsx : navigation, recherche, panneaux, heure, météo, scénarios, rapports et captures.
+- client/src/state/viewStore.ts : couche, caméra, panneau, orbite et qualité.
+- client/src/components/MiniMap.tsx : plan interactif local, sans clé cartographique.
+- client/src/styles.css : thème Studio, responsive, dialogues et accessibilité clavier.
+
+VILLE 3D
+- CampusScene.tsx : géométrie urbaine, sélection et tick cible 20 Hz.
+- CityAtmosphere.tsx : soleil, lumière ambiante, brouillard et précipitations.
+- CityCamera.tsx : transitions de caméra et suivi d’un habitant.
+- BuildingMesh.tsx : façades, fenêtres, équipements de toit et parc.
+- CityInstances.tsx : détails répétés rendus par instanciation.
+- EnvironmentDetails.tsx : arbres, mobilier, relief et rivière.
+- Roads.tsx / cityLayout.ts : voies, trottoirs, passages piétons et emprises.
+- CityPeople.tsx : piétons animés instanciés ; CityTraffic.tsx : véhicules illustratifs.
+
+SIMULATION
+- state/store.ts : état Zustand, tick, pause, vitesse, population, métriques.
+- state/environmentLogic.ts : horaires, saisons, population cible et normalisation de l’horloge.
+- sim/agentBehavior.ts : emplois du temps, énergie, humeur et destinations.
+- lib/world.ts : présences, entrées, trajets, distances et coordonnées géographiques.
+- lib/urbanInsights.ts : quatre scénarios, occupation, énergie/confort/pression des flux estimés.
+- lib/directives.ts : appliquer les commandes au monde et conserver ses références cohérentes.
+- lib/persistence.ts : créations personnalisées et migration des anciennes sauvegardes.
+- components/PersistGate.tsx : préférences, sans réécriture du stockage à chaque tick.
+
+COMMANDES ET API
+- components/CommandCenter.tsx + command-center.css : copilote, statut, suggestions, historique et résultats effectifs.
+- components/AgentLoop.tsx : appels périodiques sérialisés, annulation et respect de la pause.
+- lib/api.ts : schémas client, délais et requêtes annulables.
+- server/src/index.ts : statut et routes HTTP.
+- server/src/schemas.ts : payloads et directives validés.
+- server/src/llm.ts / llm_agent.ts : modèle ou fallback local.
+- server/src/llmClient.ts : sélection DeepSeek / OpenAI, clés côté serveur uniquement.
+- server/src/fallbackDirectives.ts : compréhension locale des commandes.
+- server/tests/ : régressions des commandes locales.
+
+MÉTÉO
+- lib/weather.ts : requête Open-Meteo pour Saguenay, validation et timeout.
+- store.fetchRealWeather : import manuel depuis Réglages ; une erreur conserve le contexte courant.
+- Les conditions et indicateurs de la ville restent simulés ; ne pas les présenter comme des relevés de capteurs.
+
+MODULES HISTORIQUES
+MapView, HUD, ControlsPanel, WeatherWidget, DialogueModal et les panneaux financiers restent dans le dépôt, mais ne composent plus l’écran Studio principal.

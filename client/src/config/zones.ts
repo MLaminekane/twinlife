@@ -1,16 +1,13 @@
-// Polygones de zones pour Saguenay (approximatifs). Vous pouvez affiner les coordonnées.
-// Coordonnées sont [lon, lat] WGS84.
-
 export type ZoneKey = 'campus' | 'downtown' | 'residential' | 'commercial'
 
 export type ZonePolygon = {
   id: ZoneKey
   name: string
   color: string
-  coordinates: [number, number][] // polygone fermé (le dernier point répète le premier)
+  coordinates: [number, number][]
 }
 
-// Base city center
+// Centre de la ville (coordonnées de référence)
 const CITY = { lon: -71.065, lat: 48.428 }
 const DEG_LAT_PER_M = 1 / 111320
 const DEG_LON_PER_M = 1 / (111320 * Math.cos((CITY.lat * Math.PI) / 180))

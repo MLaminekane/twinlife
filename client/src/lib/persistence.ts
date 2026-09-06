@@ -4,12 +4,13 @@
  */
 
 import type { Building, Person } from '../state/types'
+import { initialBuildings, initPeople } from '../config/initialData'
 
 const STORAGE_KEYS = {
-  CUSTOM_BUILDINGS: 'twinlife_v2_custom_buildings',
-  CUSTOM_PEOPLE: 'twinlife_v2_custom_people',
-  MODIFIED_BUILDINGS: 'twinlife_v2_modified_buildings',
-  LAST_SAVE: 'twinlife_v2_last_save'
+  CUSTOM_BUILDINGS: 'twinlife_v3_custom_buildings',
+  CUSTOM_PEOPLE: 'twinlife_v3_custom_people',
+  MODIFIED_BUILDINGS: 'twinlife_v3_modified_buildings',
+  LAST_SAVE: 'twinlife_v3_last_save'
 }
 
 export type PersistedBuilding = Building & { 
@@ -47,7 +48,7 @@ export function loadCustomBuildings(): PersistedBuilding[] {
     const data = JSON.parse(stored)
     const buildings = data.buildings || []
     
-    // Filter out unwanted buildings (temporary cleanup)
+    // Filtrer les bâtiments indésirables (nettoyage temporaire)
     return buildings.filter((b: Building) => {
       const name = b.name.toLowerCase()
       return !name.includes('apple campus') && 
@@ -56,7 +57,7 @@ export function loadCustomBuildings(): PersistedBuilding[] {
              !name.includes('Résidence Familiale Nord')
     })
   } catch (e) {
-    console.error('Failed to load custom buildings:', e)
+    console.error('Échec du chargement des bâtiments personnalisés:', e)
     return []
   }
 }
@@ -65,7 +66,7 @@ export function loadCustomBuildings(): PersistedBuilding[] {
  * Sauvegarder les personnes personnalisées
  */
 export function saveCustomPeople(people: Person[]) {
-  const customPeople = people.filter(p => p.role || p.workplace || p.department)
+  const customPeople = people.filter(p => p.isCustom)
   const data = {
     people: customPeople.map(p => ({
       ...p,
@@ -86,13 +87,21 @@ export function loadCustomPeople(): PersistedPerson[] {
     const data = JSON.parse(stored)
     const people = data.people || []
     
-    // Migration: Ensure state exists
-    return people.map((p: any) => ({
+    // Old versions saved every resident with a role. Keep genuine custom profiles,
+    // including low IDs from smaller worlds, while discarding unchanged seed copies.
+    const seeded = new Map(initPeople(500, initialBuildings).map(person => [person.id, person]))
+    return people.filter((person: Person) => {
+      if (person.isCustom) return true
+      if (person.dynamicVisitor) return false
+      const original = seeded.get(person.id)
+      return !original || person.name !== original.name || person.role !== original.role || person.workplace !== original.workplace || Boolean(person.department || person.customData)
+    }).map((p: Person) => ({
       ...p,
+      isCustom: true,
       state: p.state || { currentActivity: 'idle', mood: 'neutral', history: [] }
     }))
   } catch (e) {
-    console.error('Failed to load custom people:', e)
+    console.error('Échec du chargement des personnes personnalisées:', e)
     return []
   }
 }
@@ -118,7 +127,7 @@ export function loadModifiedBuildings(): Record<string, Partial<Building>> {
     const data = JSON.parse(stored)
     return data.modifications || {}
   } catch (e) {
-    console.error('Failed to load modified buildings:', e)
+    console.error('Échec du chargement des modifications de bâtiments:', e)
     return {}
   }
 }

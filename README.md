@@ -1,140 +1,89 @@
-# Twinlife — Digital Twin Universitaire
+# Twinlife Studio — La ville, vivante.
 
-Un jumeau numérique de campus universitaire avec visualisation 3D temps réel, tableau de bord analytique, carte Mapbox de Saguenay et intégration LLM pour piloter des scénarios en langage naturel.
+Twinlife est une simulation urbaine interactive située dans un territoire fictif de Saguenay. Explorez quatre quartiers en 3D, suivez les habitants et expérimentez les conséquences d’un festival, d’une tempête ou d’une heure de pointe.
 
-## Présentation de la Problématique / Contexte d'Utilisation
+L’application simule une ville : elle n’est pas synchronisée avec des capteurs municipaux. L’énergie, le confort et la pression des déplacements sont des estimations du modèle. L’import manuel de météo utilise Open-Meteo.
 
-Les directions d'université, DSI et équipes pédagogiques ont besoin d'une vue dynamique et compréhensible des activités du campus: affluence par bâtiment, flux de personnes, occupation, et influence du contexte (heure, saison, week‑end). Les outils classiques fragmentent ces informations et rendent difficile l'exploration de scénarios (ex. journée d'examens, midi, événement spécial) en temps réel. Twinlife propose un jumeau numérique interactif permettant d'observer, simuler et expliquer ces phénomènes, avec une interface accessible et des commandes en langage naturel.
+## Démarrer
 
-## ✨ Nouvelles Fonctionnalités LLM (Décembre 2025)
-
-### 🤖 Assistant LLM Dynamique avec Persistance Complète
-
-Le système LLM peut maintenant **modifier dynamiquement** la simulation avec **sauvegarde automatique** :
-
-- **Créer des personnes** avec nom, rôle, lieu de travail et département
-- **Ajouter des bâtiments** dans les 4 zones (campus, downtown, residential, commercial)
-- **Supprimer** personnes et bâtiments
-- **Persistance localStorage** : toutes les modifications survivent au rechargement
-
-### Exemples de Commandes :
-
-```
-"ajoute Lamine comme employé à la banque"
-"crée un nouveau café dans la zone commerciale"
-"ajoute 5 étudiants à l'université"
-"construis un laboratoire de recherche sur le campus"
-"supprime le bâtiment X"
-```
-
-📖 **Documentation détaillée** : [LLM_SYSTEM.md](./LLM_SYSTEM.md)
-
-## Brève Description du Projet
-
-Twinlife est une application temps réel composée d’un front 3D (React + React Three Fiber) et d’une API Express. Elle affiche le campus, ~200 personnes en mouvement, des indicateurs d’activité et une carte Mapbox centrée sur Saguenay qui visualise la population (heatmap et points). Le public cible inclut: décideurs académiques, responsables de services (logistique, sécurité, DSI), urbanistes/architectes, chercheurs en mobilité et étudiants.
-
-## Diagramme d’Architecture (Haut Niveau)
-
-```mermaid
-flowchart TB
-	subgraph Client[Client (React + R3F + Mapbox)]
-		U[Utilisateur]
-		UI[UI & Panneau de Contrôles]
-		ST[Zustand Store]
-		SCN[Scène 3D\n(Bâtiments, Personnes, HUD)]
-	MAP[Mapbox Saguenay\n(Heatmap + Points)]
-		U -->|Saisie, clics| UI
-		UI -->|applyDirective| ST
-		ST -->|tick| SCN
-		ST -->|people → GeoJSON| MAP
-	end
-
-	subgraph Server[Serveur (Express + Zod)]
-		API[/POST /api/llm/]
-		PARSER[Validation Zod\nDirective]
-		DS{Clé LLM ?}
-		LLM[(DeepSeek / OpenAI)]
-		F[Fallback Rules FR]
-	end
-
-	UI -- prompt FR --> API
-	API --> PARSER
-	PARSER --> DS
-	DS -- Oui --> LLM
-	DS -- Non --> F
-	LLM -->|Directive JSON| PARSER
-	F -->|Directive JSON| PARSER
-	PARSER -->|Directive JSON| UI
-```
-
-Explications rapides:
-
-- Le client envoie le prompt en français à l’API (`/api/llm`).
-- Le serveur choisit DeepSeek/OpenAI si une clé est disponible, sinon applique des règles de secours (fallback) robustes en FR.
-- Le serveur renvoie une Directive JSON validée par Zod (activité, ajout de personnes/bâtiments, visibilité, environnement…).
-- Le store côté client applique la directive et la boucle de simulation (tick) met à jour la scène 3D et la carte Mapbox (population en direct).
-
-## Rôle du LLM et Valeur Ajoutée
-
-Rôle:
-
-- Traduire des demandes en langage naturel (ex. « augmente l’activité en Sciences et Ingénierie », « journée d’examens », « midi », « cache Droit ») en une Directive JSON structurée.
-- Permettre la manipulation rapide des paramètres (activité, flux, population, visibilité, environnement) sans menus complexes.
-
-Valeur ajoutée vs méthodes traditionnelles:
-
-- Expressivité: pas besoin d’UI compliquée ni de scripts — le texte suffit.
-- Rapidité d’itération: enchaînez des scénarios (examens, événements, midi/soir, week‑end) instantanément.
-- Personnalisation: les prompts s’adaptent au contexte (saisons, période de la journée, week‑end) et au vocabulaire local.
-- Résilience: si aucune clé LLM n’est disponible, un fallback FR couvre les cas courants (activités, visibilité, population, scénarios types).
-
-## Caractéristiques
-
-- 3D réaliste (Three.js via React Three Fiber)
-- 8 bâtiments nommés avec ombres, fenêtres animées, glow
-- ~200 personnes animées se déplaçant entre les bâtiments (population dynamique)
-- Barres d’activité sous chaque bâtiment
-- Grille de campus avec rues: Avenue Principale, Allée Ouest
-- Dashboard (coin supérieur gauche) avec métriques: total personnes, bâtiments actifs, occupation totale
-- Panneau de contrôles: pause, vitesse, filtres, options glow/shadows/labels
-- Boîte LLM pour influencer la simulation (ex: « Augmente l’activité en Sciences »)
-- Carte Mapbox Saguenay: heatmap + points de la population simulée, mode plein écran
-
-## Démarrage rapide
-
-1. Installer les dépendances
+Prérequis : Node.js 22.12+ (branche 22) ou 24+, et npm 10.9+.
 
 ```sh
-npm install
-npm --prefix client install
-npm --prefix server install
-```
-
-2. Configurer la clé LLM (optionnel mais recommandé)
-
-- Copier `server/.env.example` vers `server/.env` et renseigner `OPENAI_API_KEY`
-
-3. Lancer en développement
-
-```sh
+npm ci
 npm run dev
 ```
 
-- Client: http://localhost:5173
-- API: http://localhost:8787
+- Application : http://localhost:5173
+- API : http://localhost:8787
+- Le client et le serveur se rechargent automatiquement pendant le développement.
 
-## Scripts utiles
+L’installation se fait uniquement à la racine. Le `package-lock.json` racine verrouille les deux workspaces `client` et `server`. Après une modification des dépendances, utilisez `npm install` à la racine.
 
-- `npm run dev` lance client + serveur en parallèle
-- `npm run build` construit client et serveur
-- `npm run test` exécute les tests côté client (Vitest)
+Le copilote fonctionne en mode local sans clé. Pour activer un modèle, créez un fichier `server/.env` à partir de `server/.env.example`, puis renseignez `DEEPSEEK_API_KEY` ou `OPENAI_API_KEY`. Ne versionnez jamais ce fichier. Si les deux clés existent, DeepSeek est prioritaire.
 
-## Structure
+## Explorer la ville
 
-- `client/` application React + R3F
-- `server/` API Express + LLM
+- **Vue d’ensemble** : population présente, occupation, énergie estimée, historique et événements.
+- **Bâtiments** : sélection depuis la 3D, le plan interactif ou la recherche ; capacité, activité, horaires et occupants.
+- **Habitants** : recherche nominative, suivi de caméra, destination, activité, humeur et énergie.
+- **Scénarios** : heure de pointe, festival, tempête hivernale et nuit tranquille. Ils modifient les conditions et les déplacements ; le panneau compare occupation, piétons et énergie avec l’instant de lancement.
+- **Copilote** : commandes en français, statut du service et résumé des changements réellement appliqués.
+- **Réglages** : météo, saisons, import manuel des conditions de Saguenay, ombres, éclairage, qualité graphique et dynamiques de recherche.
 
-## Notes
+Les points de vue Général, Campus, Centre-ville et Vue du ciel sont accessibles au-dessus de la scène. Les couches **Réaliste**, **Activité** et **Mobilité** montrent respectivement la ville, l’intensité des bâtiments et les trajets piétons. L’orbite cinématique, la capture PNG et le plein écran complètent l’exploration.
 
-- Sans `OPENAI_API_KEY`, le serveur utilise un générateur de règles simple.
-- Le client proxifie `/api` vers le serveur (port 8787).
+La frise permet de régler l’heure, de mettre en pause et d’accélérer à 1×, 3× ou 10×. À 1×, une journée simulée dure environ 15 minutes. L’export de rapport produit un JSON contenant l’environnement, les indicateurs, les bâtiments et l’historique disponible.
+
+| Raccourci | Action                                      |
+| --------- | ------------------------------------------- |
+| `Espace`  | Pause / reprise                             |
+| `1` à `4` | Points de vue                               |
+| `K`       | Rechercher un lieu ou un habitant           |
+| `Échap`   | Fermer une fenêtre ou quitter une sélection |
+
+## Rendu et moteur
+
+Le rendu comprend des façades et fenêtres instanciées, balcons, équipements de toiture, panneaux solaires, arbres, mobilier urbain, passages piétons, véhicules et piétons animés. L’éclairage, le brouillard et les précipitations suivent les conditions de la simulation.
+
+Les habitants disposent d’un domicile, d’un rôle, d’horaires, de traits et d’un niveau d’énergie. La présence intérieure est distinguée des déplacements. Le moteur avance à une fréquence cible de 20 mises à jour par seconde ; une pause gèle l’horloge, l’activité, la population et la recherche. Les décisions autonomes via l’API sont désactivées par défaut et s’arrêtent aussi pendant la pause.
+
+Les bâtiments et personnages personnalisés, ainsi que certaines préférences, sont conservés dans le stockage local du navigateur. Il ne s’agit pas d’une sauvegarde complète de la session ni d’une synchronisation entre appareils.
+
+## Commandes utiles
+
+```sh
+npm test                    # Tests client et serveur
+npm run build               # Compilation client et serveur
+npm run test --workspace client
+npm run test --workspace server
+npm run start --workspace server
+```
+
+Le build client vérifie TypeScript sans émettre de JavaScript à côté des sources, puis produit `client/dist`. Le serveur compile vers `server/dist`. Les anciens fichiers `.js` présents dans `client/src` sont des artefacts historiques ; Vite donne priorité aux `.ts` et `.tsx`.
+
+## Architecture
+
+```text
+client/src/
+  components/ExperienceShell.tsx  Interface, panneaux et raccourcis
+  components/City*.tsx           Caméra, atmosphère, piétons, circulation
+  components/CommandCenter.tsx   Centre de commandes
+  state/store.ts                État et boucle de simulation
+  state/environmentLogic.ts     Horaires, rythme et population cible
+  lib/world.ts                  Présence et navigation des habitants
+  lib/urbanInsights.ts           Scénarios et indicateurs estimés
+  lib/persistence.ts            Personnages et bâtiments personnalisés
+server/src/
+  index.ts                      Routes HTTP
+  schemas.ts                    Validation des directives
+  fallbackDirectives.ts         Commandes locales
+  llmClient.ts                  Configuration du fournisseur de modèle
+```
+
+Stack : React 19, TypeScript, Vite 8, Three.js / React Three Fiber, Zustand, Express 5 et Zod. Les modules historiques Mapbox, finance et dialogue restent dans le dépôt ; ils ne font pas partie de l’écran Studio principal. Si le composant Mapbox est réactivé, son jeton public doit être fourni via `VITE_MAPBOX_TOKEN` dans `client/.env`, jamais inscrit directement dans les sources. N’utilisez aucune clé secrète dans une variable `VITE_*`, qui est exposée au navigateur.
+
+## Limites actuelles
+
+La géométrie urbaine est procédurale, les trajets utilisent un réseau simplifié et la circulation des véhicules est illustrative. Le modèle ne constitue ni une prévision de mobilité validée, ni un bilan énergétique réglementaire. La qualité graphique dépend du GPU ; le mode Équilibrée réduit la résolution et les effets. La météo et les fournisseurs LLM exigent une connexion réseau ; les fonctions de simulation locales restent utilisables sans eux.
+
+Voir [les exemples](EXAMPLES.md), [le système de commandes](LLM_SYSTEM.md), [le guide des fichiers](ASSISTANT_GUIDE.txt) et [le rapport du projet](RAPPORT_PROJET.md).

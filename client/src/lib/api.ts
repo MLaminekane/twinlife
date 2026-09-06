@@ -1,6 +1,11 @@
 import { z } from 'zod'
 import type { Directive as StoreDirective } from '../state/store'
 
+function requestSignal(signal?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(45_000)
+  return signal ? AbortSignal.any([signal, timeout]) : timeout
+}
+
 const DirectiveSchema = z.object({
   buildingActivityChanges: z.array(z.object({ buildingName: z.string(), activityDelta: z.number() })).optional(),
   buildingActivitySet: z.array(z.object({ buildingName: z.string(), level: z.number() })).optional(),
@@ -12,15 +17,19 @@ const DirectiveSchema = z.object({
     name: z.string().optional(),
     role: z.union([z.literal('student'), z.literal('employee'), z.literal('professor'), z.literal('visitor'), z.literal('worker')]).optional(),
     workplace: z.string().optional(),
-    department: z.string().optional()
+    department: z.string().optional(),
+    customData: z.record(z.any()).optional()
   })).optional(),
   buildingAdd: z.array(z.object({ 
     name: z.string(), 
     position: z.tuple([z.number(), z.number(), z.number()]).optional(), 
     size: z.tuple([z.number(), z.number(), z.number()]).optional(),
     zone: z.union([z.literal('campus'), z.literal('downtown'), z.literal('residential'), z.literal('commercial')]).optional(),
-    activity: z.number().optional()
+    type: z.enum(['academic', 'research', 'administration', 'residence', 'healthcare', 'food', 'fitness', 'office', 'retail', 'civic', 'park', 'entertainment']).optional(),
+    capacity: z.number().positive().optional(),
+    activity: z.number().min(0).max(1).optional()
   })).optional(),
+  buildingEvents: z.array(z.object({ buildingName: z.string(), events: z.array(z.object({ text: z.string(), type: z.enum(['urgent', 'info', 'sale']), time: z.string().optional() })) })).optional(),
   buildingRemove: z.array(z.string()).optional(),
   peopleRemove: z.array(z.object({ name: z.string().optional(), id: z.number().optional(), all: z.boolean().optional() })).optional(),
   global: z.object({ speedMultiplier: z.number().optional(), speedSet: z.number().optional(), resetRandom: z.boolean().optional() }).partial().optional(),
@@ -39,17 +48,21 @@ const DirectiveSchema = z.object({
   environment: z.object({
     season: z.union([z.literal('hiver'), z.literal('printemps'), z.literal('ete'), z.literal('automne')]).optional(),
     dayPeriod: z.union([z.literal('matin'), z.literal('midi'), z.literal('apresmidi'), z.literal('soir'), z.literal('nuit')]).optional(),
+    gameTime: z.number().min(0).lt(24).optional(),
+    temperature: z.number().min(-60).max(55).optional(),
+    condition: z.enum(['clear', 'rain', 'snow', 'cloudy']).optional(),
     weekend: z.boolean().optional()
   }).partial().optional()
 })
 
 export type Directive = z.infer<typeof DirectiveSchema>
 
-export async function sendLLM(prompt: string): Promise<StoreDirective> {
+export async function sendLLM(prompt: string, signal?: AbortSignal): Promise<StoreDirective> {
   const res = await fetch('/api/llm', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt })
+    body: JSON.stringify({ prompt }),
+    signal: requestSignal(signal)
   })
   if (!res.ok) throw new Error('LLM API error')
   const json = await res.json()
@@ -58,7 +71,7 @@ export async function sendLLM(prompt: string): Promise<StoreDirective> {
   return parsed.data as StoreDirective
 }
 
-// Agent API
+// API des agents autonomes
 const AgentInputSchema = z.object({
   id: z.string(),
   role: z.union([z.literal('prof'), z.literal('student'), z.literal('rector')]),
@@ -74,8 +87,8 @@ const AgentActionSchema = z.object({ id: z.string(), publish: z.boolean().option
 
 export type AgentAction = z.infer<typeof AgentActionSchema>
 
-export async function sendAgentsDecision(payload: z.infer<typeof AgentBatchSchema>): Promise<{ actions: AgentAction[] }> {
-  const res = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+export async function sendAgentsDecision(payload: z.infer<typeof AgentBatchSchema>, signal?: AbortSignal): Promise<{ actions: AgentAction[] }> {
+  const res = await fetch('/api/agent', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), signal: requestSignal(signal) })
   if (!res.ok) throw new Error('Agent API error')
   const json = await res.json()
   const actions = Array.isArray(json.actions) ? json.actions : []

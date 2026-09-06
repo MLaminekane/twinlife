@@ -6,9 +6,9 @@ export function WeatherWidget() {
     const fetchWeather = useStore(s => s.fetchRealWeather)
 
     useEffect(() => {
-        // Initial fetch if realTime is not set or on mount
+        // Récupération initiale si realTime n'est pas défini ou au montage
         fetchWeather()
-        // Refresh every 10 minutes
+        // Rafraîchir toutes les 10 minutes
         const interval = setInterval(fetchWeather, 600000)
         return () => clearInterval(interval)
     }, [fetchWeather])

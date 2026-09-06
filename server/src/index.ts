@@ -14,6 +14,11 @@ app.use(cors())
 const limiter = rateLimit({ windowMs: 15*60*1000, max: 1000 })
 app.use('/api/', limiter)
 
+app.get('/api/status', (_req, res) => {
+  const provider = process.env.DEEPSEEK_API_KEY ? 'DeepSeek' : process.env.OPENAI_API_KEY ? 'OpenAI' : null
+  res.json({ mode: provider ? 'llm' : 'local', provider })
+})
+
 const DialogueSchema = z.object({
   agent1: z.object({ name: z.string(), role: z.string(), traits: z.any(), mood: z.string() }),
   agent2: z.object({ name: z.string(), role: z.string(), traits: z.any(), mood: z.string() }),
@@ -42,11 +47,8 @@ app.post('/api/chat/dialogue', async (req, res) => {
   `
   
   try {
-    // We reuse llmDirective or create a new simple chat function. 
-    // Since llmDirective returns JSON, we might want a raw text function or just wrap the result.
-    // Let's assume we want raw text for now, or a simple JSON object.
-    // I'll use a new helper or just reuse llmDirective if it can handle text.
-    // Actually, let's just use the existing llmDirective but ask for a JSON structure with "dialogue" field.
+    // On réutilise llmDirective pour générer le dialogue
+    // On demande un format JSON avec un champ "dialogue"
     
     const jsonPrompt = `
       ${prompt}

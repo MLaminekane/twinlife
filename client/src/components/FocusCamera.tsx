@@ -17,29 +17,29 @@ export function FocusCamera() {
     const p = people.find(pp => pp.id === selectedId)
     if (!p) { setSelected(null); return }
 
-    // Desired target is the person position
+    // La cible souhaitée est la position de la personne
     target.current.set(p.position[0], p.position[1], p.position[2])
 
-    // Desired camera position: behind and above relative to current view
+    // Position caméra souhaitée : derrière et au-dessus par rapport à la vue actuelle
     const cam = camera as THREE.PerspectiveCamera
     const offsetBack = 6
     const offsetUp = 3.2
-    // compute back direction from camera to person
+    // calculer la direction arrière de la caméra vers la personne
     tmp.current.copy(cam.position).sub(target.current).normalize()
     desired.current.copy(target.current)
     desired.current.addScaledVector(tmp.current, offsetBack)
     desired.current.y += offsetUp
 
-    // Smoothly interpolate camera position and controls target
+    // Interpoler doucement la position de la caméra et la cible des contrôles
     cam.position.lerp(desired.current, Math.min(1, dt * 2.5))
     if ((controls as any)?.target) {
       ;(controls as any).target.lerp(target.current, Math.min(1, dt * 3.0))
       ;(controls as any).update?.()
     }
 
-    // Stop focusing if very close
+    // Arrêter le focus si très proche
     if (cam.position.distanceTo(desired.current) < 0.05) {
-      // keep selection to maintain PeopleLabels, or clear? We'll keep it.
+      // garder la sélection pour maintenir PeopleLabels, ou effacer ? On garde.
     }
   })
 

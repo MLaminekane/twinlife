@@ -7,10 +7,10 @@ export function AutoTarget() {
   const { camera, controls } = useThree((s: any) => ({ camera: s.camera, controls: s.controls }))
 
   useFrame(() => {
-    if (selectedId) return // FocusCamera drives target
+    if (selectedId) return // FocusCamera gère la cible
     const cam = camera as THREE.PerspectiveCamera
     const dir = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion).normalize()
-    // Intersect with ground plane y=0
+    // Intersecter avec le plan du sol y=0
     const EPS = 1e-4
     if (Math.abs(dir.y) < EPS) return
     const t = -cam.position.y / dir.y

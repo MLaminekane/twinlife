@@ -1,7 +1,9 @@
 import type { Directive, Building, Person, Settings, Environment, NewsItem } from '../state/store'
-import { seededRandom, randomName, findNonOverlappingPosition, overlapsXZ } from './helpers'
+import { randomName, findNonOverlappingPosition, overlapsXZ } from './helpers'
+import { normalizeEnvironment } from '../state/environmentLogic'
 import { initPeople } from '../config/initialData'
 import { saveState } from './persistence'
+import { computeDefaultEntrance, sampleInsideBuilding, worldToGeo } from './world'
 
 interface DirectiveContext {
     buildings: Building[]
@@ -16,10 +18,12 @@ interface DirectiveContext {
 export function applyDirective(
     directive: Directive,
     context: DirectiveContext,
-    get: () => any
+    _get: () => any
 ): Partial<DirectiveContext> {
-    console.log('[applyDirective] Directive reçue:', directive)
-    const { buildings: stateBuildings, people, settings: stateSettings, environment, news: stateNews, effects: stateEffects, buildingEvents: stateBuildingEvents } = context
+    const { buildings: stateBuildings, people: statePeople, settings: stateSettings, environment, news: originalNews, effects: stateEffects, buildingEvents: stateBuildingEvents } = context
+
+    const people = statePeople.map(person => ({ ...person, state: { ...person.state, history: [...person.state.history] } }))
+    const stateNews = [...originalNews]
 
     const pushNews = (item: Omit<NewsItem, 'id' | 'ts'>) => {
         const id = stateNews.length ? stateNews[stateNews.length - 1].id + 1 : 1
@@ -29,11 +33,11 @@ export function applyDirective(
     }
 
     let buildings = stateBuildings.map(b => ({ ...b }))
-    const settings = { ...stateSettings }
+    const settings = { ...stateSettings, visibleBuildings: new Set(stateSettings.visibleBuildings) }
     let envOut = environment
     const buildingEvents = { ...stateBuildingEvents }
 
-    // Building Events
+    // Événements de bâtiments
     if (directive.buildingEvents) {
         directive.buildingEvents.forEach(evt => {
             const b = buildings.find(x => x.name.toLowerCase().includes(evt.buildingName.toLowerCase()))
@@ -46,7 +50,7 @@ export function applyDirective(
         })
     }
 
-    // Building activity changes
+    // Changements d'activité des bâtiments
     if (directive.buildingActivityChanges) {
         directive.buildingActivityChanges.forEach(change => {
             const b = buildings.find(x => x.name.toLowerCase().includes(change.buildingName.toLowerCase()))
@@ -54,7 +58,7 @@ export function applyDirective(
         })
     }
 
-    // Global speed controls
+    // Contrôles de vitesse globale
     if (directive.global?.speedMultiplier) {
         settings.speed = Math.max(0.1, Math.min(5, settings.speed * directive.global.speedMultiplier))
     }
@@ -62,20 +66,26 @@ export function applyDirective(
         settings.speed = Math.max(0.1, Math.min(5, directive.global.speedSet))
     }
 
-    // Person flows
+    // Flux de personnes
     if (directive.personFlows) {
-        const rand = seededRandom(123)
+        const assigned = new Set<number>()
         directive.personFlows.forEach(flow => {
-            const target = buildings.find(x => x.name.toLowerCase().includes(flow.to.toLowerCase()))
+            const target = buildings.find(building => building.id === flow.to || building.name.toLowerCase().includes(flow.to.toLowerCase()))
             if (!target) return
-            for (let i = 0; i < flow.count; i++) {
-                const p = people[Math.floor(rand() * people.length)]
-                p.targetBuildingId = target.id
+            const source = flow.from ? buildings.find(building => building.id === flow.from || building.name.toLowerCase().includes(flow.from!.toLowerCase())) : undefined
+            if (flow.from && !source) return
+            const candidates = people.filter(person => !assigned.has(person.id) && person.currentBuildingId !== target.id && (!source || person.currentBuildingId === source.id))
+            for (const person of candidates.slice(0, Math.max(0, Math.floor(flow.count)))) {
+                person.targetBuildingId = target.id
+                person.route = []
+                person.routeIndex = 0
+                person.state = { ...person.state, currentActivity: 'commuting', talkingWith: undefined, commandRemaining: 120, scheduledTask: undefined }
+                assigned.add(person.id)
             }
         })
     }
 
-    // Set absolute activity
+    // Définir l'activité absolue
     if (directive.buildingActivitySet) {
         directive.buildingActivitySet.forEach(s => {
             const b = buildings.find(x => x.name.toLowerCase().includes(s.buildingName.toLowerCase()))
@@ -83,7 +93,7 @@ export function applyDirective(
         })
     }
 
-    // Timed effects
+    // Effets temporisés
     let effectsOut = stateEffects.slice()
     if (directive.effects) {
         directive.effects.forEach(e => {
@@ -102,7 +112,7 @@ export function applyDirective(
         })
     }
 
-    // Add buildings
+    // Ajouter des bâtiments
     if (directive.buildingAdd) {
         directive.buildingAdd.forEach(add => {
             const id = add.name.toLowerCase().replace(/\s+/g, '-').slice(0, 12) + '-' + Math.floor(Math.random() * 1000)
@@ -122,7 +132,11 @@ export function applyDirective(
                 size, 
                 activity: add.activity ?? 0.5, 
                 occupancy: 0,
-                zone: add.zone,
+                capacity: add.capacity ?? Math.round(size[0] * size[2] * 6),
+                zone: add.zone ?? 'commercial',
+                type: add.type ?? 'office',
+                entrances: [computeDefaultEntrance([pos[0], 2, pos[2]], size, add.zone ?? 'commercial')],
+                geoPosition: worldToGeo([pos[0], 2, pos[2]]),
                 isCustom: true
             })
             settings.visibleBuildings.add(id)
@@ -130,22 +144,33 @@ export function applyDirective(
         })
     }
 
-    // Remove buildings
+    // Supprimer des bâtiments
     if (directive.buildingRemove) {
         directive.buildingRemove.forEach(idOrName => {
             const index = buildings.findIndex(b => 
                 b.id === idOrName || 
                 b.name.toLowerCase().includes(idOrName.toLowerCase())
             )
-            if (index !== -1) {
+            if (index !== -1 && buildings.length > 1) {
                 const removed = buildings[index]
                 buildings.splice(index, 1)
                 settings.visibleBuildings.delete(removed.id)
                 // Réaffecter les personnes qui étaient dans ce bâtiment
                 people.forEach(p => {
-                    if (p.targetBuildingId === removed.id || p.workplace === removed.id) {
+                    if (p.targetBuildingId === removed.id || p.workplace === removed.id || p.currentBuildingId === removed.id || p.homeBuildingId === removed.id || p.schedule.some(task => task.targetId === removed.id)) {
                         const newTarget = buildings[Math.floor(Math.random() * buildings.length)]
                         p.targetBuildingId = newTarget.id
+                        p.route = []
+                        p.routeIndex = 0
+                        if (p.homeBuildingId === removed.id) p.homeBuildingId = newTarget.id
+                        p.schedule = p.schedule.map(task => task.targetId === removed.id ? { ...task, targetId: newTarget.id } : task)
+                        if (p.currentBuildingId === removed.id) {
+                            p.currentBuildingId = newTarget.id
+                            p.position = sampleInsideBuilding(newTarget, p.id)
+                            p.presence = 'inside'
+                            p.route = []
+                            p.routeIndex = 0
+                        }
                         if (p.workplace === removed.id) {
                             p.workplace = newTarget.id
                         }
@@ -156,7 +181,7 @@ export function applyDirective(
         })
     }
 
-    // Add people
+    // Ajouter des personnes
     if (directive.peopleAdd) {
         directive.peopleAdd.forEach(add => {
             const startIndex = people.length ? Math.max(...people.map(p => p.id)) + 1 : 0
@@ -166,16 +191,17 @@ export function applyDirective(
             for (let i = 0; i < add.count; i++) {
                 const id = startIndex + i
                 const b = target ?? buildings[Math.floor(Math.random() * buildings.length)]
-                const pos: [number, number, number] = [
-                    b.position[0] + (Math.random() - 0.5) * b.size[0],
-                    0.1,
-                    b.position[2] + (Math.random() - 0.5) * b.size[2]
-                ]
+                const pos = sampleInsideBuilding(b, id + 1)
                 people.push({ 
                     id, 
                     position: pos, 
                     targetBuildingId: b.id, 
+                    currentBuildingId: b.id,
+                    homeBuildingId: b.id,
                     speed: 0.8 + Math.random() * 0.6, 
+                    heading: Math.random() * Math.PI * 2,
+                    presence: 'inside',
+                    isCustom: true,
                     gender: add.gender, 
                     name: add.name || randomName(Math.random),
                     role: add.role,
@@ -196,7 +222,7 @@ export function applyDirective(
         })
     }
 
-    // Remove people
+    // Supprimer des personnes
     if (directive.peopleRemove) {
         directive.peopleRemove.forEach(remove => {
             if (remove.all) {
@@ -221,7 +247,7 @@ export function applyDirective(
         })
     }
 
-    // Visibility controls
+    // Contrôles de visibilité
     if (directive.visibility) {
         const vb = new Set(settings.visibleBuildings)
         const byName = (name: string) => buildings.find(x => x.name.toLowerCase().includes(name.toLowerCase()))?.id
@@ -243,38 +269,29 @@ export function applyDirective(
         }
     }
 
-    // UI settings
+    // Paramètres d'interface
     if (directive.settings) {
         if (typeof directive.settings.glow === 'boolean') settings.glow = directive.settings.glow
         if (typeof directive.settings.shadows === 'boolean') settings.shadows = directive.settings.shadows
         if (typeof directive.settings.labels === 'boolean') settings.labels = directive.settings.labels
     }
 
-    // Environment
+    // Environnement
     if (directive.environment) {
-        envOut = { ...get().environment, ...directive.environment }
+        envOut = normalizeEnvironment(environment, directive.environment)
     }
 
-    // Reset random
+    // Réinitialiser aléatoirement
     if (directive.global?.resetRandom) {
         const newBuildings = buildings.map(b => ({ ...b, activity: 0.2 + Math.random() * 0.6, occupancy: 0 }))
         const newPeople = initPeople(people.length, newBuildings)
-        return { buildings: newBuildings, people: newPeople, settings, effects: effectsOut, environment: envOut, buildingEvents }
+        return { buildings: newBuildings, people: newPeople, settings, effects: effectsOut, environment: envOut, buildingEvents, news: stateNews }
     }
 
     // Sauvegarder l'état après modifications
     if (directive.buildingAdd || directive.peopleAdd || directive.buildingRemove || directive.peopleRemove) {
-        console.log('[applyDirective] Sauvegarde:', { buildings: buildings.length, people: people.length })
         saveState(buildings, people)
     }
 
-    const returnValue = { buildings, people, settings, effects: effectsOut, environment: envOut, buildingEvents }
-    console.log('[applyDirective] Retour:', { 
-        buildings: returnValue.buildings?.length, 
-        people: returnValue.people?.length,
-        hasBuildings: !!returnValue.buildings,
-        hasPeople: !!returnValue.people
-    })
-
-    return returnValue
+    return { buildings, people, settings, effects: effectsOut, environment: envOut, buildingEvents, news: stateNews }
 }

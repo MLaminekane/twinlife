@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-// Directive Schema
+// Schéma de directive
 export const DirectiveSchema = z.object({
   buildingActivityChanges: z.array(z.object({ buildingName: z.string(), activityDelta: z.number() })).optional(),
   buildingActivitySet: z.array(z.object({ buildingName: z.string(), level: z.number() })).optional(),
@@ -28,6 +28,8 @@ export const DirectiveSchema = z.object({
     position: z.tuple([z.number(), z.number(), z.number()]).optional(), 
     size: z.tuple([z.number(), z.number(), z.number()]).optional(),
     zone: z.union([z.literal('campus'), z.literal('downtown'), z.literal('residential'), z.literal('commercial')]).optional(),
+    type: z.enum(['academic', 'research', 'administration', 'residence', 'healthcare', 'food', 'fitness', 'office', 'retail', 'civic', 'park', 'entertainment']).optional(),
+    capacity: z.number().positive().optional(),
     activity: z.number().min(0).max(1).optional()
   })).optional(),
   buildingRemove: z.array(z.string()).optional(),
@@ -52,13 +54,16 @@ export const DirectiveSchema = z.object({
   environment: z.object({
     season: z.union([z.literal('hiver'), z.literal('printemps'), z.literal('ete'), z.literal('automne')]).optional(),
     dayPeriod: z.union([z.literal('matin'), z.literal('midi'), z.literal('apresmidi'), z.literal('soir'), z.literal('nuit')]).optional(),
+    gameTime: z.number().min(0).lt(24).optional(),
+    temperature: z.number().min(-60).max(55).optional(),
+    condition: z.enum(['clear', 'rain', 'snow', 'cloudy']).optional(),
     weekend: z.boolean().optional()
   }).partial().optional()
 })
 
 export type Directive = z.infer<typeof DirectiveSchema>
 
-// Agent Schemas
+// Schémas des agents autonomes
 export const AgentInputSchema = z.object({
   id: z.string(),
   role: z.union([z.literal('prof'), z.literal('student'), z.literal('rector')]),
@@ -109,5 +114,5 @@ export const AgentBatchSchema = z.object({
 
 export type AgentBatch = z.infer<typeof AgentBatchSchema>
 
-// API Request Schemas
+// Schémas des requêtes API
 export const PromptSchema = z.object({ prompt: z.string().min(1).max(2000) })

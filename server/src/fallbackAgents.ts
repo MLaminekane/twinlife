@@ -13,7 +13,6 @@ export function fallbackAgentDecide(agent: AgentInput, world: World): AgentActio
   const isAIInclined = (agent.dept === 'eng' || agent.dept === 'bio')
   const isHumInclined = (agent.dept === 'art' || agent.dept === 'law' || agent.dept === 'eco')
 
-  // Memory nudges
   const mem = (agent.memory ?? []).slice(-5).join(' ').toLowerCase()
   const memCollab = mem.includes('collab') ? 0.1 : 0
   const memRiv = mem.includes('rival') || mem.includes('défie') ? 0.07 : 0
@@ -26,7 +25,6 @@ export function fallbackAgentDecide(agent: AgentInput, world: World): AgentActio
   const rnd = Math.random()
   const action: AgentAction = { id: agent.id }
 
-  // Rector special behavior
   if (agent.role === 'rector') {
     const dir = (b.ai - b.humanities) + (aiW - humW) * 0.2
     if (Math.abs(dir) > 0.05) {
@@ -40,13 +38,11 @@ export function fallbackAgentDecide(agent: AgentInput, world: World): AgentActio
 
   if (rnd < pubProb) action.publish = true
 
-  // Collaboration
   if (Math.random() < collabProb) {
     const choices = world.departments.map(d => d.id).filter(id => id !== agent.dept)
     action.seekCollabWith = choices.length ? choices[Math.floor(Math.random()*choices.length)] : null
   }
 
-  // Rivalry
   if (Math.random() < rivalProb) {
     const choices = world.departments.map(d => d.id).filter(id => id !== agent.dept)
     action.challenge = choices.length ? choices[Math.floor(Math.random()*choices.length)] : null

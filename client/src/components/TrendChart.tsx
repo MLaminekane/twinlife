@@ -3,11 +3,11 @@ import { useStore } from '../state/store'
 
 function pathFrom(values: number[], w: number, h: number) {
   if (!values.length) return ''
-  const max = Math.max(...values, 1) // Ensure max is at least 1 to avoid division by zero
-  const min = 0 // Always start from 0 for better context
+  const max = Math.max(...values, 1) // S'assurer que max est au moins 1 pour éviter division par zéro
+  const min = 0 // Toujours commencer à 0 pour un meilleur contexte
   const scale = (v: number) => {
     const nv = (v - min) / (max - min)
-    return h - nv * (h - 10) - 5 // Padding top/bottom
+    return h - nv * (h - 10) - 5 // Marges haut/bas
   }
   const step = values.length > 1 ? w / (values.length - 1) : w
   let d = `M 0 ${scale(values[0])}`

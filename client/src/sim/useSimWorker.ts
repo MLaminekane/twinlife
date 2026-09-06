@@ -24,9 +24,7 @@ interface UseSimWorkerReturn {
     updateState: (state: { buildings?: Building[], people?: Person[], environment?: Environment }) => void
 }
 
-/**
- * Custom hook to manage the simulation worker
- */
+
 export function useSimWorker({ enabled, buildings, people, environment }: UseSimWorkerProps): UseSimWorkerReturn {
     const workerRef = useRef<Worker | null>(null)
     const [ready, setReady] = useState(false)
@@ -43,7 +41,6 @@ export function useSimWorker({ enabled, buildings, people, environment }: UseSim
         }
 
         try {
-            // Create worker
             const worker = new Worker(
                 new URL('../sim/worker.ts', import.meta.url),
                 { type: 'module' }
@@ -51,13 +48,11 @@ export function useSimWorker({ enabled, buildings, people, environment }: UseSim
 
             workerRef.current = worker
 
-            // Handle messages from worker
             worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
                 const { type, payload } = e.data
 
                 switch (type) {
                     case 'worker_ready':
-                        // Initialize worker with current state
                         worker.postMessage({
                             type: 'init',
                             payload: { buildings, people, environment }
@@ -70,7 +65,6 @@ export function useSimWorker({ enabled, buildings, people, environment }: UseSim
                         break
 
                     case 'tick_result':
-                        // Resolve pending tick promise
                         if (pendingResolveRef.current) {
                             pendingResolveRef.current(payload)
                             pendingResolveRef.current = null
@@ -78,7 +72,6 @@ export function useSimWorker({ enabled, buildings, people, environment }: UseSim
                         break
 
                     case 'state_updated':
-                        // State update acknowledged
                         break
 
                     default:
@@ -100,9 +93,8 @@ export function useSimWorker({ enabled, buildings, people, environment }: UseSim
             console.error('[Worker] Failed to create worker:', error)
             setReady(false)
         }
-    }, [enabled]) // Only recreate if enabled changes
+    }, [enabled])
 
-    // Update worker state when buildings/people/environment change externally
     useEffect(() => {
         if (ready && workerRef.current) {
             workerRef.current.postMessage({
@@ -125,7 +117,6 @@ export function useSimWorker({ enabled, buildings, people, environment }: UseSim
                 payload: { dt, speed, environment }
             })
 
-            // Timeout fallback (100ms)
             setTimeout(() => {
                 if (pendingResolveRef.current) {
                     console.warn('[Worker] Tick timeout, using null result')

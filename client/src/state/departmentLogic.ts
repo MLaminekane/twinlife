@@ -20,7 +20,7 @@ export function processDepartmentDynamics(
     const colRate = baseCol * (0.6 + 0.7 * (aiW * 0.6 + humW * 0.4))
     const rivRate = baseRiv * (0.7 + 0.6 * (aiW * 0.5 + (1 - humW) * 0.3))
     
-    // Publish
+    // Publication
     if (Math.random() < pubRate * dt) {
       d.publications += 1
       const b = buildings.find(x => x.id === d.buildingId)
@@ -31,7 +31,7 @@ export function processDepartmentDynamics(
       if (news.length > 50) news.shift()
     }
     
-    // Collaboration
+    // Collaboration entre départements
     if (Math.random() < colRate * dt) {
       const others = departments.filter(x => x.id !== d.id)
       const peer = others[Math.floor(Math.random() * others.length)]
@@ -43,7 +43,7 @@ export function processDepartmentDynamics(
       if (news.length > 50) news.shift()
     }
     
-    // Rivalry
+    // Rivalité entre départements
     if (Math.random() < rivRate * dt) {
       const others = departments.filter(x => x.id !== d.id)
       const peer = others[Math.floor(Math.random() * others.length)]

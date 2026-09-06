@@ -18,7 +18,7 @@ export function BuildingActivityPanel() {
     [buildings, selectedBuildingId]
   )
 
-  // Fetch finance data if Economics building is selected
+  // Récupérer les données financières si le bâtiment Économie est sélectionné
   useEffect(() => {
     if (selectedBuildingId === 'bus') {
       const load = async () => {
@@ -26,7 +26,7 @@ export function BuildingActivityPanel() {
         setFinanceData(data)
       }
       load()
-      const interval = setInterval(load, 60000) // Refresh every 60s for news/rss
+      const interval = setInterval(load, 60000) // Rafraîchir toutes les 60s pour les news/rss
       return () => clearInterval(interval)
     } else {
       setFinanceData(null)
@@ -34,22 +34,35 @@ export function BuildingActivityPanel() {
   }, [selectedBuildingId])
 
   const buildingPeople = useMemo(() => 
-    people.filter(p => p.targetBuildingId === selectedBuildingId || p.workplace === selectedBuildingId),
+    people.filter(p => p.currentBuildingId === selectedBuildingId && p.presence === 'inside'),
     [people, selectedBuildingId]
   )
 
-  // Categorize people
-  const stats = useMemo(() => ({
-    total: buildingPeople.length,
-    students: buildingPeople.filter(p => p.role === 'student').length,
-    employees: buildingPeople.filter(p => p.role === 'employee' || p.role === 'worker').length,
-    professors: buildingPeople.filter(p => p.role === 'professor').length,
-    visitors: buildingPeople.filter(p => p.role === 'visitor').length,
-    doctors: buildingPeople.filter(p => p.customData?.job === 'doctor' || (building?.id.includes('hospital') && p.role === 'employee')).length,
-    patients: buildingPeople.filter(p => p.customData?.status === 'patient' || (building?.id.includes('hospital') && p.role === 'visitor')).length,
-  }), [buildingPeople, building])
+  const inboundPeople = useMemo(() =>
+    people.filter(p => p.targetBuildingId === selectedBuildingId && p.currentBuildingId !== selectedBuildingId),
+    [people, selectedBuildingId]
+  )
 
-  // Generate context-aware events/news
+  // Catégoriser les personnes
+  const stats = useMemo(() => {
+    const occupancy = building?.occupancy ?? 0
+    const capacity = building?.capacity ?? 0
+
+    return {
+      total: occupancy,
+      inbound: inboundPeople.length,
+      capacity,
+      load: capacity ? Math.round((occupancy / capacity) * 100) : 0,
+      students: buildingPeople.filter(p => p.role === 'student').length,
+      employees: buildingPeople.filter(p => p.role === 'employee' || p.role === 'worker').length,
+      professors: buildingPeople.filter(p => p.role === 'professor').length,
+      visitors: buildingPeople.filter(p => p.role === 'visitor').length,
+      doctors: buildingPeople.filter(p => p.customData?.job === 'doctor' || (building?.id.includes('hospital') && p.role === 'employee')).length,
+      patients: buildingPeople.filter(p => p.customData?.status === 'patient' || (building?.id.includes('hospital') && p.role === 'visitor')).length,
+    }
+  }, [building, buildingPeople, inboundPeople])
+
+  // Générer des évènements/news contextuels
   const events = useMemo(() => {
     if (!building || !selectedBuildingId) return []
     const dynamic = buildingEvents[selectedBuildingId] || []
@@ -70,9 +83,9 @@ export function BuildingActivityPanel() {
       
       <div className="panel-content">
         {isEco && financeData ? (
-          // === ECONOMICS / FINANCE VIEW ===
+          // === VUE ÉCONOMIE / FINANCE ===
           <div className="finance-view">
-            {/* Bitcoin Ticker */}
+            {/* Ticker Bitcoin */}
             <div className="ticker-box">
               <div className="label">BITCOIN (BTC)</div>
               <div className="value-row">
@@ -83,7 +96,7 @@ export function BuildingActivityPanel() {
               </div>
             </div>
 
-            {/* Market Sentiment */}
+            {/* Sentiment du marché */}
             <div className="sentiment-row">
               <span className="label">MARKET SENTIMENT</span>
               <span className={`sentiment ${financeData.marketSentiment === 'Bullish' ? 'bull' : 'bear'}`}>
@@ -91,7 +104,7 @@ export function BuildingActivityPanel() {
               </span>
             </div>
 
-            {/* Stocks */}
+            {/* Actions */}
             <div className="stocks-list">
               <div className="label">TOP MOVERS</div>
               {financeData.topStocks.map(s => (
@@ -105,7 +118,7 @@ export function BuildingActivityPanel() {
               ))}
             </div>
 
-            {/* News Feed */}
+            {/* Fil d'actualités */}
             <div className="news-feed">
               <div className="label">LATEST NEWS</div>
               <div className="news-scroll">
@@ -128,11 +141,16 @@ export function BuildingActivityPanel() {
             </div>
           </div>
         ) : (
-          // === STANDARD VIEW ===
+          // === VUE STANDARD ===
           <>
             <div className="stat-row main-stat">
               <span className="label">Occupancy</span>
-              <span className="value">{stats.total} <small>people</small></span>
+              <span className="value">{stats.total} <small>/ {stats.capacity}</small></span>
+            </div>
+
+            <div className="stat-row" style={{ marginTop: -8 }}>
+              <span className="label">Load</span>
+              <span className="value" style={{ fontSize: '1rem', color: '#cbd5e1' }}>{stats.load}% <small>• {stats.inbound} inbound</small></span>
             </div>
 
             <div className="stats-grid">

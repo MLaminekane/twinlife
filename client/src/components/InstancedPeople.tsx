@@ -189,8 +189,8 @@ export function InstancedPeople() {
             const heightVariation = 0.95 + (person.id % 10) * 0.02
             tempObject.scale.set(1, heightVariation, 1)
             
-            // Rotation aléatoire
-            tempObject.rotation.y = (person.id * 0.7) % (Math.PI * 2)
+            // Orientation basée sur la direction réelle de déplacement
+            tempObject.rotation.y = person.heading ?? 0
 
             tempObject.updateMatrix()
             mesh.setMatrixAt(i, tempObject.matrix)

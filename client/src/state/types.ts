@@ -1,11 +1,34 @@
+export type ZoneKey = 'campus' | 'downtown' | 'residential' | 'commercial'
+
+export type BuildingType =
+  | 'academic'
+  | 'research'
+  | 'administration'
+  | 'residence'
+  | 'healthcare'
+  | 'food'
+  | 'fitness'
+  | 'office'
+  | 'retail'
+  | 'civic'
+  | 'park'
+  | 'entertainment'
+
+export type PresenceState = 'inside' | 'walking'
+
 export type Building = {
   id: string
   name: string
   position: [number, number, number]
   size: [number, number, number]
   activity: number // 0..1
-  occupancy: number // persons count inside
-  zone?: 'campus' | 'downtown' | 'residential' | 'commercial' // Zone d'appartenance
+  occupancy: number // Nombre de personnes à l'intérieur
+  capacity: number
+  zone: ZoneKey
+  type: BuildingType
+  entrances: [number, number, number][]
+  geoPosition: [number, number]
+  openingHours?: { open: number; close: number }
   isCustom?: boolean // Marqueur pour les bâtiments créés dynamiquement
   customData?: Record<string, any> // Données personnalisées
 }
@@ -14,16 +37,24 @@ export type Person = {
   id: number
   position: [number, number, number]
   targetBuildingId: string
+  currentBuildingId: string | null
+  homeBuildingId?: string
   speed: number
+  heading?: number
+  route?: [number, number, number][]
+  routeIndex?: number
+  presence: PresenceState
   gender?: 'male' | 'female'
   name: string
+  isCustom?: boolean
+  dynamicVisitor?: boolean
   // Métadonnées professionnelles
   role?: 'student' | 'employee' | 'professor' | 'visitor' | 'worker'
   workplace?: string // ID du bâtiment où la personne travaille
   department?: string // Département d'appartenance
   customData?: Record<string, any> // Données personnalisées
-  
-  // LangGraph Agent Properties
+
+  // Propriétés de l'agent (comportement autonome)
   traits: {
     introversion: number // 0..1 (1 = avoids crowds)
     punctuality: number // 0..1 (1 = strictly follows schedule)
@@ -37,8 +68,10 @@ export type Person = {
   state: {
     currentActivity: string
     mood: 'happy' | 'tired' | 'stressed' | 'neutral' | 'talking'
-    history: string[] // Last 5 building IDs
-    talkingWith?: number // ID of the other person
+    history: string[] // Historique des 5 derniers bâtiments visités
+    talkingWith?: number // ID de l'interlocuteur
+    commandRemaining?: number // Simulation seconds during which an explicit destination is respected
+    scheduledTask?: string
     conversationTopic?: string
   }
 }
@@ -67,15 +100,18 @@ export type Environment = {
   weekend: boolean
   realTime?: boolean
   temperature?: number
-  gameTime: number // 0-24
+  gameTime: number
   condition?: 'clear' | 'rain' | 'snow' | 'cloudy'
+  activeScenario?: 'commute' | 'festival' | 'storm' | 'night'
+  populationFactor?: number
+  scenarioRemaining?: number
 }
 
 export type Directive = {
   buildingActivityChanges?: { buildingName: string; activityDelta: number }[]
   buildingActivitySet?: { buildingName: string; level: number }[]
   personFlows?: { from?: string; to: string; count: number }[]
-  peopleAdd?: { 
+  peopleAdd?: {
     count: number
     gender?: 'male' | 'female'
     to?: string
@@ -89,11 +125,13 @@ export type Directive = {
     buildingName: string
     events: { text: string; type: 'urgent' | 'info' | 'sale'; time?: string }[]
   }[]
-  buildingAdd?: { 
+  buildingAdd?: {
     name: string
     position?: [number, number, number]
     size?: [number, number, number]
-    zone?: 'campus' | 'downtown' | 'residential' | 'commercial'
+    zone?: ZoneKey
+    type?: BuildingType
+    capacity?: number
     activity?: number
   }[]
   buildingRemove?: string[] // IDs des bâtiments à supprimer
@@ -132,7 +170,7 @@ export type NewsItem = {
   text: string
 }
 
-export type TimeSample = { 
+export type TimeSample = {
   ts: number
   ai: number
   hum: number
@@ -161,7 +199,7 @@ export type Scenario = {
   llmAgents: boolean
 }
 
-export type AgentAction = { 
+export type AgentAction = {
   id: string
   publish?: boolean
   seekCollabWith?: string | null
@@ -180,6 +218,7 @@ export type Store = {
   scenario: Scenario
   timeseries?: TimeSample[]
   tsAcc?: number
+  populationAcc?: number
   selectedPersonId: number | null
   hoveredBuildingId: string | null
   selectedBuildingId: string | null

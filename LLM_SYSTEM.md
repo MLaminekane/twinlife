@@ -1,214 +1,63 @@
-# Système LLM Dynamique - Twinlife
+# Centre de commandes — Twinlife Studio
 
-## 🎯 Fonctionnalités
+Le copilote traduit une instruction en directive structurée, validée côté serveur et côté client, puis l’applique au moteur de simulation. La création d’un lieu ou d’un habitant fonctionne aussi avec les règles locales.
 
-Le système LLM peut maintenant modifier dynamiquement la simulation avec **persistance complète** :
+## Modes de fonctionnement
 
-### ✨ Création de Personnes
+`GET /api/status` indique le mode configuré :
 
-- Ajouter des personnes avec **nom spécifique**
-- Définir un **rôle** : `student`, `employee`, `professor`, `visitor`, `worker`
-- Assigner un **lieu de travail** (workplace)
-- Définir un **département**
-
-**Exemples :**
-
-```
-"ajoute Lamine comme employé à la banque"
-"crée un professeur nommé Marie au département de médecine"
-"ajoute 5 étudiants à l'université"
+```json
+{ "mode": "local", "provider": null }
 ```
 
-### 🏢 Création de Bâtiments
+Avec une clé, `mode` vaut `llm` et `provider` indique `DeepSeek` ou `OpenAI`. Aucune clé n’est renvoyée. Le statut décrit la configuration : il ne constitue pas un test de disponibilité du fournisseur.
 
-- Créer des bâtiments personnalisés
-- Définir la **zone** : `campus`, `downtown`, `residential`, `commercial`
-- Spécifier position et taille (optionnel)
-- Niveau d'activité initial
+`server/src/llmClient.ts` choisit DeepSeek en priorité, sinon OpenAI. Sans clé, les fonctions de génération utilisent les règles locales. Si une requête au modèle échoue ou produit une directive invalide, elles peuvent aussi utiliser ces règles.
 
-**Exemples :**
+## Routes
 
-```
-"crée un nouveau café dans la zone commerciale"
-"ajoute un laboratoire de recherche sur le campus"
-"construis un immeuble résidentiel"
-```
+| Route                     | Rôle                                                         |
+| ------------------------- | ------------------------------------------------------------ |
+| `GET /api/status`         | Mode et fournisseur configuré                                |
+| `POST /api/llm`           | Transformer `{ "prompt": "…" }` en directive                 |
+| `POST /api/agent`         | Décisions structurées d’un lot d’agents                      |
+| `POST /api/chat/dialogue` | Route historique de dialogue ; non intégrée à l’écran Studio |
 
-### 🗑️ Suppression
+Les payloads invalides reçoivent une réponse HTTP 400. Le serveur applique une limitation de fréquence aux routes `/api/`. Les requêtes client disposent d’une durée maximale et peuvent être annulées.
 
-- Supprimer des bâtiments par nom ou ID
-- Supprimer des personnes par nom ou ID
-- Supprimer toutes les personnes
+## Directives
 
-**Exemples :**
+Les schémas de référence se trouvent dans `server/src/schemas.ts` et `client/src/lib/api.ts`. Ils couvrent notamment :
 
-```
-"supprime le bâtiment café"
-"retire la personne Lamine"
-"supprime tous les visiteurs"
-```
+- Ajout de personnes : nom, quantité, rôle, destination, lieu de travail et métadonnées.
+- Ajout de bâtiments : nom, quartier, type, capacité, position et dimensions.
+- Suppression de personnes ou de bâtiments, selon la directive reçue.
+- Niveau ou variation d’activité et événements des bâtiments.
+- Déplacements de groupes entre une source et une destination.
+- Heure, saison, météo, température et rythme de semaine.
+- Vitesse, visibilité, éclairage, ombres et effets temporaires.
 
-## 💾 Persistance
+La suppression conserve au moins un bâtiment et réassigne les références devenues invalides. Les ordres de déplacement persistent suffisamment longtemps pour ne pas être immédiatement écrasés par l’emploi du temps de l’habitant.
 
-**TOUTES les modifications sont sauvegardées automatiquement dans le localStorage :**
+Le centre de commandes compare l’état avant et après l’application. Il distingue une modification effective d’une demande sans effet et garde jusqu’à huit échanges tant que le panneau reste monté.
 
-- Les personnes créées par le LLM restent même après rechargement
-- Les bâtiments personnalisés sont persistants
-- Les métadonnées (rôles, lieux de travail) sont conservées
+## Décisions autonomes
 
-### Gestion de la persistance
+L’option des Réglages active `AgentLoop.tsx`. Une boucle stable examine l’état courant toutes les trois secondes. Elle sérialise les appels : une seule requête peut être en cours. Environ toutes les quinze secondes, elle peut réorienter un groupe vers un lieu actif ; sinon elle sollicite des décisions de recherche et collaboration.
 
-```typescript
-import {
-  saveState,
-  loadCustomBuildings,
-  loadCustomPeople,
-  clearPersistedData,
-} from "./lib/persistence";
+La pause ou la désactivation annule la requête en cours. Une réponse reçue après une pause ne modifie pas la ville. Les scénarios lancés par l’utilisateur sont respectés par les décisions urbaines automatiques.
 
-// Charger au démarrage (automatique)
-const customBuildings = loadCustomBuildings();
-const customPeople = loadCustomPeople();
+## Persistance
 
-// Sauvegarder (automatique après chaque directive)
-saveState(buildings, people);
+Les bâtiments `isCustom` et les personnes `isCustom` sont sauvegardés localement après les directives. Le chargeur migre les anciennes sauvegardes qui contenaient toute la population de base, afin d’éviter les duplications.
 
-// Effacer toutes les données
-clearPersistedData();
+Les positions de tous les habitants, le journal complet, les effets temporaires et l’ensemble des suppressions de bâtiments prédéfinis ne constituent pas une sauvegarde intégrale. Les données restent propres au navigateur utilisé. Le rapport JSON exportable est un document d’observation, pas un format de restauration.
+
+## Validation
+
+```sh
+npm run test --workspace server
+npm run test --workspace client
 ```
 
-## 🔧 API LLM
-
-### Structure des directives
-
-```typescript
-type Directive = {
-  peopleAdd?: [
-    {
-      count: number;
-      name?: string; // Nom spécifique
-      role?: "student" | "employee" | "professor" | "visitor" | "worker";
-      workplace?: string; // Nom du bâtiment
-      department?: string;
-      to?: string; // Destination initiale
-      gender?: "male" | "female";
-    }
-  ];
-
-  buildingAdd?: [
-    {
-      name: string;
-      zone?: "campus" | "downtown" | "residential" | "commercial";
-      activity?: number; // 0-1
-      position?: [x, y, z];
-      size?: [w, h, d];
-    }
-  ];
-
-  buildingRemove?: string[]; // IDs ou noms
-
-  peopleRemove?: [
-    {
-      name?: string;
-      id?: number;
-      all?: boolean;
-    }
-  ];
-
-  // ... autres propriétés existantes
-};
-```
-
-### Exemples de requêtes
-
-1. **Ajouter une personne spécifique :**
-
-```
-User: "ajoute Lamine comme employé à la banque"
-LLM: {
-  "peopleAdd": [{
-    "count": 1,
-    "name": "Lamine",
-    "role": "employee",
-    "workplace": "banque"
-  }]
-}
-```
-
-2. **Créer un bâtiment :**
-
-```
-User: "crée un nouveau restaurant dans la zone commerciale"
-LLM: {
-  "buildingAdd": [{
-    "name": "Restaurant Le Gourmet",
-    "zone": "commercial",
-    "activity": 0.7
-  }]
-}
-```
-
-3. **Supprimer :**
-
-```
-User: "supprime Lamine"
-LLM: {
-  "peopleRemove": [{
-    "name": "Lamine"
-  }]
-}
-```
-
-## 🎨 Interface Utilisateur
-
-### Panneau LLM
-
-Le composant `LLMPanel` affiche :
-
-- Zone de saisie pour les commandes
-- Liste des personnes personnalisées avec leurs métadonnées
-- Exemples de commandes
-- État de chargement
-
-### Intégration
-
-```tsx
-import { LLMPanel } from "./components/LLMPanel";
-
-// Dans App.tsx
-<button onClick={() => setShowLLM((v) => !v)}>🤖 Assistant LLM</button>;
-{
-  showLLM && <LLMPanel />;
-}
-```
-
-## 🔄 Workflow
-
-1. **L'utilisateur entre une commande** : "ajoute Lamine à la banque"
-2. **Le LLM génère une directive** JSON structurée
-3. **La directive est appliquée** au store
-4. **Les modifications sont sauvegardées** automatiquement dans localStorage
-5. **Au rechargement**, les données sont **restaurées automatiquement**
-
-## 🛡️ Validation
-
-Tous les schémas sont validés avec Zod :
-
-- `server/src/schemas.ts` - Validation serveur
-- `client/src/lib/api.ts` - Validation client
-- Types TypeScript stricts pour la sécurité
-
-## 📝 Notes importantes
-
-- Les bâtiments personnalisés ont la propriété `isCustom: true`
-- Les positions non spécifiées sont calculées automatiquement pour éviter les chevauchements
-- Les personnes supprimées d'un bâtiment sont réaffectées automatiquement
-- La persistance est basée sur localStorage (limite ~5-10MB selon le navigateur)
-
-## 🚀 Prochaines améliorations possibles
-
-- Export/import JSON des configurations
-- Interface graphique pour éditer les personnes
-- Historique des modifications (undo/redo)
-- Recherche et filtrage avancé
-- Statistiques sur les personnes par rôle/lieu
+Les tests vérifient les suggestions du copilote, les noms, quantités, lieux, horaires et conditions, les faux positifs, la préservation des champs par les schémas, les erreurs réseau et l’arrêt des décisions pendant une pause.

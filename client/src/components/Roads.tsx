@@ -1,106 +1,126 @@
-import { Text } from '@react-three/drei'
 import { useMemo } from 'react'
+import { useStore } from '../state/store'
+import { CityInstances, type CityInstance } from './CityInstances'
+import { CITY_ROADS, overlapsBuilding } from './cityLayout'
 
-function RoadSegment({ 
-  length, 
-  width, 
-  position, 
-  rotation = 0, 
-  name 
-}: { 
-  length: number, 
-  width: number, 
-  position: [number, number, number], 
-  rotation?: number,
-  name?: string 
-}) {
-  const markingsCount = Math.floor(length / 2)
-  
+export function Roads({ mobility = false }: { mobility?: boolean }) {
+  const layoutKey = useStore((s) =>
+    s.buildings.map((b) => `${b.id}:${b.position}:${b.size}`).join('|'),
+  )
+  const wet = useStore((s) => s.environment.condition === 'rain')
+  const roadwork = useMemo(() => {
+    const buildings = useStore.getState().buildings
+    const asphalt: CityInstance[] = []
+    const sidewalks: CityInstance[] = []
+    const markings: CityInstance[] = []
+    const crossings: CityInstance[] = []
+    CITY_ROADS.forEach((road) => {
+      // Clip each continuous road strip to the actual cadastral footprints.
+      let start: number | null = null
+      const flush = (end: number) => {
+        if (start === null || end <= start) return
+        const center = (start + end) / 2
+        const length = end - start
+        asphalt.push({
+          position: [
+            road.x + (road.vertical ? 0 : center),
+            0.024,
+            road.z + (road.vertical ? center : 0),
+          ],
+          scale: road.vertical
+            ? [road.width, 0.025, length]
+            : [length, 0.025, road.width],
+        })
+        for (const side of [-1, 1]) {
+          const offset = side * (road.width / 2 + 0.19)
+          sidewalks.push({
+            position: [
+              road.x + (road.vertical ? offset : center),
+              0.055,
+              road.z + (road.vertical ? center : offset),
+            ],
+            scale: road.vertical
+              ? [0.36, 0.075, length]
+              : [length, 0.075, 0.36],
+          })
+        }
+        start = null
+      }
+      for (
+        let along = -road.length / 2;
+        along <= road.length / 2;
+        along += 0.25
+      ) {
+        const x = road.x + (road.vertical ? 0 : along)
+        const z = road.z + (road.vertical ? along : 0)
+        if (overlapsBuilding(x, z, buildings, road.width / 2 + 0.22))
+          flush(along)
+        else if (start === null) start = along
+      }
+      flush(road.length / 2)
+      for (
+        let along = -road.length / 2 + 0.8;
+        along < road.length / 2;
+        along += 1.7
+      ) {
+        const x = road.x + (road.vertical ? 0 : along)
+        const z = road.z + (road.vertical ? along : 0)
+        if (overlapsBuilding(x, z, buildings, road.width / 2 + 0.8)) continue
+        const intersection = CITY_ROADS.some(
+          (other) =>
+            other.vertical !== road.vertical &&
+            Math.abs(
+              (road.vertical ? z : x) - (road.vertical ? other.z : other.x),
+            ) <
+              other.width / 2 + 0.4,
+        )
+        if (intersection) continue
+        markings.push({
+          position: [x, 0.047, z],
+          scale: road.vertical ? [0.045, 0.012, 0.7] : [0.7, 0.012, 0.045],
+        })
+      }
+    })
+    for (const [x, z] of [
+      [-2, -2],
+      [-2, 18],
+      [-2, -18],
+      [-18, -2],
+      [18, -2],
+    ]) {
+      for (const side of [-1, 1])
+        for (let stripe = -3; stripe <= 3; stripe++) {
+          const px = x + stripe * 0.27
+          const pz = z + side * 1.8
+          if (!overlapsBuilding(px, pz, buildings, 0.7))
+            crossings.push({
+              position: [px, 0.056, pz],
+              scale: [0.16, 0.018, 0.62],
+            })
+        }
+    }
+    return { asphalt, sidewalks, markings, crossings }
+  }, [layoutKey])
   return (
-    <group position={position} rotation={[0, rotation, 0]}>
-      {/* Asphalt */}
-      <mesh rotation-x={-Math.PI/2} position={[0, 0.001, 0]} receiveShadow>
-        <planeGeometry args={[length, width]} />
-        <meshStandardMaterial color="#1e293b" roughness={0.8} />
-      </mesh>
-
-      {/* Sidewalks */}
-      <mesh rotation-x={-Math.PI/2} position={[0, 0.002, width/2 + 0.2]}>
-        <planeGeometry args={[length, 0.4]} />
-        <meshStandardMaterial color="#64748b" roughness={0.9} />
-      </mesh>
-      <mesh rotation-x={-Math.PI/2} position={[0, 0.002, -width/2 - 0.2]}>
-        <planeGeometry args={[length, 0.4]} />
-        <meshStandardMaterial color="#64748b" roughness={0.9} />
-      </mesh>
-
-      {/* Dashed Line Markings */}
-      {Array.from({ length: markingsCount }).map((_, i) => (
-        <mesh 
-          key={i} 
-          rotation-x={-Math.PI/2} 
-          position={[-length/2 + 1 + i * 2, 0.003, 0]}
-        >
-          <planeGeometry args={[1, 0.1]} />
-          <meshStandardMaterial color="#ffffff" opacity={0.6} transparent />
-        </mesh>
-      ))}
-
-      {/* Road Name */}
-      {name && (
-        <Text 
-          position={[0, 0.02, 0]} 
-          fontSize={width * 0.4} 
-          color="#94a3b8" 
-          anchorX="center" 
-          anchorY="middle" 
-          rotation-x={-Math.PI/2}
-          fillOpacity={0.5}
-        >
-          {name}
-        </Text>
-      )}
+    <group>
+      <CityInstances
+        items={roadwork.sidewalks}
+        color="#c6c5b6"
+        roughness={0.94}
+      />
+      <CityInstances
+        items={roadwork.asphalt}
+        color={mobility ? '#334d52' : '#515956'}
+        roughness={wet ? 0.24 : 0.96}
+        metalness={wet ? 0.28 : 0.025}
+      />
+      <CityInstances
+        items={roadwork.markings}
+        color={mobility ? '#90e4d0' : '#ccc8ad'}
+        emissive={mobility ? '#6ebeb1' : '#000000'}
+        emissiveIntensity={mobility ? 0.6 : 0}
+      />
+      <CityInstances items={roadwork.crossings} color="#e7e3cb" />
     </group>
   )
 }
-
-export function Roads() {
-	return (
-		<group>
-			{/* Main Avenue (East-West) */}
-			<RoadSegment 
-        length={80} 
-        width={2.5} 
-        position={[0, 0, -2]} 
-        name="Avenue Principale" 
-      />
-
-			{/* West Alley (North-South) */}
-			<RoadSegment 
-        length={80} 
-        width={1.8} 
-        position={[-6, 0, 0]} 
-        rotation={Math.PI/2} 
-        name="Allée Ouest" 
-      />
-
-      {/* East Loop (North-South) */}
-      <RoadSegment 
-        length={60} 
-        width={1.8} 
-        position={[15, 0, 0]} 
-        rotation={Math.PI/2} 
-        name="Promenade Est" 
-      />
-
-      {/* North Connector */}
-      <RoadSegment 
-        length={25} 
-        width={1.5} 
-        position={[4.5, 0, -15]} 
-        name="Chemin Nord" 
-      />
-		</group>
-	)
-}
-

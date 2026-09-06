@@ -22,6 +22,8 @@ export const DIRECTIVE_SYSTEM_PROMPT = `Tu es un planificateur de campus univers
     "position"?: [number, number, number], 
     "size"?: [number, number, number],
     "zone"?: "campus"|"downtown"|"residential"|"commercial",
+    "type"?: "academic"|"research"|"administration"|"residence"|"healthcare"|"food"|"fitness"|"office"|"retail"|"civic"|"park"|"entertainment",
+    "capacity"?: number,
     "activity"?: number
   }],
   "buildingRemove"?: string[],
@@ -36,6 +38,9 @@ export const DIRECTIVE_SYSTEM_PROMPT = `Tu es un planificateur de campus univers
   "environment"?: { 
     "season"?: "hiver"|"printemps"|"ete"|"automne", 
     "dayPeriod"?: "matin"|"midi"|"apresmidi"|"soir"|"nuit", 
+    "gameTime"?: number,
+    "temperature"?: number,
+    "condition"?: "clear"|"rain"|"snow"|"cloudy",
     "weekend"?: boolean 
   }
 }
@@ -47,12 +52,15 @@ NOUVELLES FONCTIONNALITES:
 - Pour l'hôpital, tu peux ajouter des docteurs et patients via "customData": { "job": "doctor" } ou { "status": "patient" }.
 - Tu peux créer des BATIMENTS avec zone (campus/downtown/residential/commercial)
 - Tu peux SUPPRIMER des bâtiments et des personnes
-- TOUTES les modifications sont PERSISTANTES et ne disparaissent PAS au rechargement
+- Les bâtiments et personnages personnalisés sont sauvegardés. Les heures, déplacements, activités et événements décrivent la session simulée courante.
 
 Règles:
 - activityDelta ∈ [-1, 1]
 - level ∈ [0, 1]
 - speedMultiplier > 0 ; speedSet ∈ [0.1, 5]
+- gameTime ∈ [0, 24[ : 18h30 devient 18.5
+- count entier entre 1 et 200 pour peopleAdd. Ne crée pas un bâtiment quand la demande ajoute seulement une personne.
+- Les noms et types de bâtiments doivent correspondre à la demande. Ne promets aucune action extérieure à cette simulation.
 - buildingName/workplace peuvent être des sous-textes (ex: "Sciences", "banque")
 Ne mets aucun texte hors JSON.`
 

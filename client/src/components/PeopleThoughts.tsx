@@ -39,7 +39,7 @@ function ThoughtBubble({ person }: { person: Person }) {
   
   useFrame(({ clock }) => {
     if (groupRef.current) {
-      // Smoothly follow the person
+      // Suivre doucement la personne
       groupRef.current.position.set(
         person.position[0],
         0.9 + Math.sin(clock.getElapsedTime() * 3 + person.id) * 0.05,
@@ -75,12 +75,12 @@ export function PeopleThoughts() {
 
   useFrame(({ clock }) => {
     const t = clock.getElapsedTime()
-    if (t - lastUpdate.current > 0.2) { // Update list every 200ms
+    if (t - lastUpdate.current > 0.2) { // Mettre à jour la liste toutes les 200ms
       lastUpdate.current = t
       
       const candidates: Person[] = []
-      const maxDist = 25 // Increased range
-      const maxCount = 50 // More bubbles
+      const maxDist = 25 // Portée augmentée
+      const maxCount = 50 // Plus de bulles
       
       for (let i = 0; i < people.length; i++) {
         const p = people[i]

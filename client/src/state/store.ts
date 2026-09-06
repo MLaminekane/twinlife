@@ -2,43 +2,232 @@ import { create } from 'zustand'
 import { initialBuildings, initPeople } from '../config/initialData'
 import { applyDirective as applyDirectiveLogic } from '../lib/directives'
 import { randomName } from '../lib/helpers'
-import { initializeAgents, applyAgentActionsLogic } from './agentLogic'
+import {
+  computeDefaultEntrance,
+  ensurePersonRoute,
+  reconcilePersonBuilding,
+  sampleInsideBuilding,
+  updatePersonTravel,
+  worldToGeo,
+} from '../lib/world'
+import { loadCustomBuildings, loadCustomPeople } from '../lib/persistence'
 import { updateAgentBehavior } from '../sim/agentBehavior'
-import { computeEnvActivityTarget, computeTargetPopulation } from './environmentLogic'
+import { initializeAgents, applyAgentActionsLogic } from './agentLogic'
 import { processDepartmentDynamics } from './departmentLogic'
-import { loadCustomBuildings, loadCustomPeople, saveState } from '../lib/persistence'
-import type { 
-  Building, Person, Settings, Metrics, Environment, Directive, 
-  Department, NewsItem, TimeSample, Agent, Scenario, AgentAction, Store 
+import { computeEnvActivityTarget, computeTargetPopulation, normalizeEnvironment, eventProbability } from './environmentLogic'
+import type {
+  Agent,
+  AgentAction,
+  Building,
+  BuildingType,
+  Department,
+  Directive,
+  Environment,
+  Metrics,
+  NewsItem,
+  Person,
+  Scenario,
+  Settings,
+  Store,
+  TimeSample,
+  ZoneKey,
 } from './types'
 
-export type { 
-  Building, Person, Settings, Metrics, Environment, Directive, 
-  Department, NewsItem, TimeSample, Agent, Scenario, AgentAction, Store 
+export type {
+  Agent,
+  AgentAction,
+  Building,
+  BuildingType,
+  Department,
+  Directive,
+  Environment,
+  Metrics,
+  NewsItem,
+  Person,
+  Scenario,
+  Settings,
+  Store,
+  TimeSample,
+  ZoneKey,
 }
 
-// Charger les données persistées au démarrage
-const customBuildings = loadCustomBuildings()
-const customPeople = loadCustomPeople()
-const allBuildings = [...initialBuildings, ...customBuildings]
+export const SIM_HOURS_PER_SECOND = 24 / 900
+
+function withOccupancy(buildings: Building[], people: Person[]): Building[] {
+  const counts = new Map<string, number>()
+  for (const person of people) {
+    if (person.currentBuildingId && person.presence === 'inside') counts.set(person.currentBuildingId, (counts.get(person.currentBuildingId) ?? 0) + 1)
+  }
+  return buildings.map(building => ({ ...building, occupancy: counts.get(building.id) ?? 0 }))
+}
+
+function inferZone(buildingId: string): ZoneKey {
+  if (buildingId.match(/^(sci|eng|med|bus|art|law|lib|gym|cafe)$/)) return 'campus'
+  if (buildingId.includes('tech') || buildingId.includes('corp') || buildingId.includes('startup') || buildingId.includes('bank') || buildingId.includes('city') || buildingId.includes('office') || buildingId.includes('hospital') || buildingId.includes('police')) return 'downtown'
+  if (buildingId.includes('res-') || buildingId.includes('park') || buildingId.includes('school')) return 'residential'
+  return 'commercial'
+}
+
+function inferBuildingType(building: Pick<Building, 'id' | 'name' | 'zone'>): BuildingType {
+  if (building.id.includes('hospital')) return 'healthcare'
+  if (building.id.includes('res-') || building.id.includes('hotel')) return 'residence'
+  if (building.id.includes('cafe') || building.id.includes('restaurant')) return 'food'
+  if (building.id.includes('gym') || building.id.includes('spa')) return 'fitness'
+  if (building.id.includes('park')) return 'park'
+  if (building.id.includes('cinema')) return 'entertainment'
+  if (building.id.includes('city') || building.id.includes('police')) return 'civic'
+  if (building.id.includes('bank') || building.id.includes('office') || building.id.includes('tech') || building.id.includes('corp') || building.id.includes('startup')) return 'office'
+  if (building.zone === 'commercial') return 'retail'
+  return 'academic'
+}
+
+function estimateCapacity(size: [number, number, number]): number {
+  return Math.max(40, Math.round(size[0] * size[2] * 6))
+}
+
+function normalizeBuilding(building: Building): Building {
+  const zone = building.zone ?? inferZone(building.id)
+  const position = building.position
+  const size = building.size
+  return {
+    ...building,
+    zone,
+    type: building.type ?? inferBuildingType({ id: building.id, name: building.name, zone }),
+    capacity: building.capacity ?? estimateCapacity(size),
+    entrances: building.entrances?.length ? building.entrances : [computeDefaultEntrance(position, size, zone)],
+    geoPosition: building.geoPosition ?? worldToGeo(position),
+    occupancy: building.occupancy ?? 0,
+  }
+}
+
+function normalizePerson(person: Person, buildings: Building[]): Person {
+  const fallbackBuilding = buildings.find(building => building.id === person.targetBuildingId) ?? buildings[0]
+  const currentBuilding = buildings.find(building => building.id === person.currentBuildingId) ?? fallbackBuilding
+  const targetBuildingId = buildings.some(building => building.id === person.targetBuildingId) ? person.targetBuildingId : currentBuilding.id
+
+  return {
+    ...person,
+    targetBuildingId,
+    currentBuildingId: person.presence === 'walking' ? null : person.currentBuildingId ?? currentBuilding.id,
+    homeBuildingId: person.homeBuildingId ?? currentBuilding.id,
+    heading: person.heading ?? 0,
+    presence: person.presence ?? (person.currentBuildingId ? 'inside' : 'walking'),
+    position: person.position ?? sampleInsideBuilding(currentBuilding, person.id),
+    route: person.route ?? [],
+    routeIndex: person.routeIndex ?? 0,
+    traits: person.traits ?? { introversion: 0.5, punctuality: 0.5, energy: 1 },
+    schedule: person.schedule ?? [{ time: 9, activity: 'work', targetId: targetBuildingId }, { time: 22, activity: 'sleep', targetId: person.homeBuildingId ?? currentBuilding.id }],
+    state: person.state ?? { currentActivity: 'idle', mood: 'neutral', history: [] },
+  }
+}
+
+function spawnDynamicVisitor(id: number, buildings: Building[]): Person {
+  const home = buildings.find(building => building.id === 'res-student') ?? buildings.find(building => building.zone === 'residential') ?? buildings[0]
+  const target = buildings
+    .slice()
+    .sort((left, right) => (right.activity + right.occupancy / Math.max(1, right.capacity)) - (left.activity + left.occupancy / Math.max(1, left.capacity)))[0]
+
+  return {
+    id,
+    position: sampleInsideBuilding(home, id + 17),
+    targetBuildingId: target.id,
+    currentBuildingId: home.id,
+    homeBuildingId: home.id,
+    speed: 0.9 + Math.random() * 0.5,
+    heading: 0,
+    presence: 'inside',
+    name: randomName(Math.random),
+    role: 'visitor',
+    dynamicVisitor: true,
+    traits: { introversion: Math.random(), punctuality: 0.4 + Math.random() * 0.3, energy: 1 },
+    schedule: [
+      { time: 9, activity: 'leisure', targetId: target.id },
+      { time: 22, activity: 'sleep', targetId: home.id },
+    ],
+    state: { currentActivity: 'idle', mood: 'neutral', history: [] },
+  }
+}
+
+function removePeopleForTargetPopulation(people: Person[], count: number, protectedId: number | null = null): Person[] {
+  if (count <= 0) return people
+
+  const ranked = people
+    .map((person, index) => ({
+      index,
+      removable: !person.isCustom && person.id !== protectedId,
+      score: (person.dynamicVisitor ? 20 : 0) + (person.role === 'visitor' ? 10 : 0) + (person.presence === 'walking' ? 5 : 0) + (person.currentBuildingId?.startsWith('res-') ? 3 : 0),
+    }))
+    .filter(entry => entry.removable)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, count)
+    .map(entry => entry.index)
+
+  const removed = new Set(ranked)
+  return people.filter((_, index) => !removed.has(index))
+}
+
+function computeMetrics(buildings: Building[], people: Person[], state: {
+  departments: Department[]
+  deptInteractions: Array<{ from: string; to: string; type: 'collab' | 'rivalry'; remaining: number }>
+}): Metrics {
+  const activeBuildings = buildings.filter(building => building.activity > 0.3).length
+  const totalOccupancy = buildings.reduce((sum, building) => sum + building.occupancy, 0)
+  const totalPublications = state.departments.reduce((sum, department) => sum + department.publications, 0)
+  const activeCollaborations = state.deptInteractions.filter(interaction => interaction.type === 'collab').length
+  const activeRivalries = state.deptInteractions.filter(interaction => interaction.type === 'rivalry').length
+
+  return {
+    totalPeople: people.length,
+    activeBuildings,
+    totalOccupancy,
+    totalPublications,
+    activeCollaborations,
+    activeRivalries,
+  }
+}
+
+const seededBuildings = initialBuildings.map(normalizeBuilding)
+const persistedBuildings = loadCustomBuildings().map(normalizeBuilding)
+const allBuildings = [...seededBuildings, ...persistedBuildings]
+const basePeople = initPeople(500, allBuildings).map(person => normalizePerson(person, allBuildings))
+const loadedPeople = loadCustomPeople()
+const usedPersonIds = new Set(basePeople.map(person => person.id))
+let nextCustomId = loadedPeople.reduce((largest, person) => Math.max(largest, person.id + 1), basePeople.length)
+const persistedPeople = loadedPeople.map(person => {
+  const id = usedPersonIds.has(person.id) ? nextCustomId++ : person.id
+  usedPersonIds.add(id)
+  return normalizePerson({ ...person, id, isCustom: true }, allBuildings)
+})
+const initialPeople = [...basePeople, ...persistedPeople]
+const initialMetrics = computeMetrics(
+  withOccupancy(allBuildings, initialPeople),
+  initialPeople,
+  { departments: [
+      { id: 'eco', name: 'Économie', buildingId: 'bus', publications: 0, collaborations: {}, rivalries: {} },
+      { id: 'bio', name: 'Biologie', buildingId: 'sci', publications: 0, collaborations: {}, rivalries: {} },
+      { id: 'eng', name: 'Ingénierie', buildingId: 'eng', publications: 0, collaborations: {}, rivalries: {} },
+    ],
+    deptInteractions: [],
+  }
+)
 
 export const useStore = create<Store>((set, get) => ({
-  buildings: allBuildings,
-  people: [...initPeople(500, allBuildings), ...customPeople],
+  buildings: withOccupancy(allBuildings, initialPeople),
+  people: initialPeople,
   settings: {
     running: true,
     speed: 1,
     glow: true,
     shadows: true,
     labels: true,
-    visibleBuildings: new Set(allBuildings.map(b => b.id))
+    visibleBuildings: new Set(allBuildings.map(building => building.id)),
   },
-  metrics: { totalPeople: 500 + customPeople.length, activeBuildings: allBuildings.length, totalOccupancy: 0 },
-  environment: { season: 'automne', dayPeriod: 'apresmidi', weekend: false, gameTime: 14 },
+  metrics: initialMetrics,
+  environment: { season: 'automne', dayPeriod: 'apresmidi', weekend: false, gameTime: 17.25, temperature: 18, condition: 'clear' },
   scenario: { investmentAI: 0.7, investmentHumanities: 0.3, llmAgents: false },
-  // timeseries buffers
-  timeseries: [] as any,
-  tsAcc: 0 as any,
+  timeseries: [],
+  tsAcc: 0,
+  populationAcc: 0,
   selectedPersonId: null,
   hoveredBuildingId: null,
   selectedBuildingId: null,
@@ -54,307 +243,213 @@ export const useStore = create<Store>((set, get) => ({
   buildingEvents: {},
   agents: initializeAgents(),
 
-  applyDirective: (d) => set(state => {
-    const result = applyDirectiveLogic(d, {
+  applyDirective: (directive) => set(state => {
+    const result = applyDirectiveLogic(directive, {
       buildings: state.buildings,
       people: state.people,
       settings: state.settings,
       environment: state.environment,
       effects: state.effects,
       news: state.news,
-      buildingEvents: state.buildingEvents
+      buildingEvents: state.buildingEvents,
     }, get)
 
-    // Mettre à jour les métriques si le nombre de personnes a changé
-    const updatedMetrics = result.people 
-      ? { ...state.metrics, totalPeople: result.people.length }
-      : state.metrics
-
-    // Mettre à jour visibleBuildings si de nouveaux bâtiments ont été ajoutés
-    if (result.buildings && result.settings?.visibleBuildings) {
-      const allBuildingIds = new Set(result.buildings.map(b => b.id))
-      const updatedVisible = new Set(
-        [...result.settings.visibleBuildings].filter(id => allBuildingIds.has(id))
-      )
-      result.settings.visibleBuildings = updatedVisible
+    if (result.buildings) {
+      result.buildings = result.buildings.map(normalizeBuilding)
+    }
+    if (result.people) {
+      result.people = result.people.map(person => normalizePerson(person, result.buildings ?? state.buildings))
     }
 
-    return { ...result, metrics: updatedMetrics }
+    if (result.buildings && result.settings?.visibleBuildings) {
+      const allBuildingIds = new Set(result.buildings.map(building => building.id))
+      result.settings.visibleBuildings = new Set(
+        [...result.settings.visibleBuildings].filter(id => allBuildingIds.has(id))
+      )
+    }
+
+    const nextBuildings = withOccupancy(result.buildings ?? state.buildings, result.people ?? state.people)
+
+    return {
+      ...result,
+      buildings: nextBuildings,
+      metrics: computeMetrics(nextBuildings, result.people ?? state.people, state),
+    }
   }),
 
   tick: (dt) => set(state => {
-    // Update visual interactions
-    if (state.deptInteractions.length) {
-      state.deptInteractions = state.deptInteractions
-        .map(e => ({ ...e, remaining: e.remaining - dt }))
-        .filter(e => e.remaining > 0)
-    }
-    if (state.deptFlashes.length) {
-      state.deptFlashes = state.deptFlashes
-        .map(f => ({ ...f, remaining: f.remaining - dt }))
-        .filter(f => f.remaining > 0)
+    if (!Number.isFinite(dt) || dt <= 0) return state
+    // A timed pause counts wall seconds; every simulated subsystem stays frozen.
+    if (!state.settings.running) {
+      if (!state.effects.some(effect => effect.type === 'pause')) return state
+      const effects = state.effects.map(effect => effect.type === 'pause' ? { ...effect, remaining: effect.remaining - dt } : effect).filter(effect => effect.remaining > 0)
+      return { effects, settings: { ...state.settings, running: effects.every(effect => effect.type !== 'pause') } }
     }
 
-    // Process department dynamics
-    processDepartmentDynamics(
-      dt,
-      state.departments,
-      state.buildings,
-      state.scenario,
-      state.deptFlashes,
-      state.deptInteractions,
-      state.news
-    )
-
-    // Update Game Time (1 real sec = 10 game mins)
-    const timeStep = (dt * 10) / 60
-    state.environment.gameTime = (state.environment.gameTime + timeStep) % 24
-
-    // Social Interaction Check (Every ~1s)
-    const shouldCheckSocial = Math.random() < 0.05 // 5% chance per frame (~3 times/sec)
-    
-    // Update Agents (LangGraph Logic)
-    for (let i = 0; i < state.people.length; i++) {
-        const p = state.people[i]
-        
-        // Ensure state exists (migration for old data)
-        if (!p.state) {
-            p.state = { currentActivity: 'idle', mood: 'neutral', history: [] }
-        }
-
-        // If talking, stay put and decrement timer (simulated by chance to stop)
-        if (p.state.currentActivity === 'talking') {
-            if (Math.random() < 0.01) { // 1% chance to stop talking per frame
-                p.state.currentActivity = 'idle'
-                p.state.talkingWith = undefined
-                p.state.mood = 'happy'
-            }
-            continue // Skip movement/behavior update while talking
-        }
-
-        // Social Check
-        if (shouldCheckSocial && p.state && p.state.currentActivity !== 'sleep' && p.state.currentActivity !== 'work') {
-            // Find neighbor
-            // Optimization: Only check next 5 people in array (random enough if array is shuffled or just simple heuristic)
-            // Better: Check people in same targetBuildingId if they are close
-            for (let j = i + 1; j < Math.min(i + 10, state.people.length); j++) {
-                const other = state.people[j]
-                if (!other || !other.state) continue
-                if (other.state.currentActivity === 'talking' || other.state.currentActivity === 'sleep') continue
-                
-                const dx = p.position[0] - other.position[0]
-                const dz = p.position[2] - other.position[2]
-                if (dx*dx + dz*dz < 2.0) { // Close enough (< 1.4m)
-                    // Interaction chance
-                    if (Math.random() < 0.3) {
-                        p.state.currentActivity = 'talking'
-                        p.state.talkingWith = other.id
-                        other.state.currentActivity = 'talking'
-                        other.state.talkingWith = p.id
-                        break
-                    }
-                }
-            }
-        }
-
-        const decision = updateAgentBehavior(p, state.environment.gameTime, state.buildings, state.environment)
-        if (decision.targetId) p.targetBuildingId = decision.targetId
-        if (decision.mood) p.state.mood = decision.mood as any
-    }
-
-    // Apply environment influences
-    for (const b of state.buildings) {
-      const target = computeEnvActivityTarget(b, state.environment)
-      b.activity += (target - b.activity) * Math.min(1, dt * 0.3)
-    }
-
-    // Adjust population based on environment
-    const targetPop = computeTargetPopulation(state.environment)
-    if (state.people.length < targetPop) {
-      const toAdd = Math.min(targetPop - state.people.length, Math.ceil(20 * dt))
-      for (let i = 0; i < toAdd; i++) {
-        const b = state.buildings.reduce((a, c) => (c.activity > a.activity ? c : a), state.buildings[0])
-        const pos: [number, number, number] = [
-          b.position[0] + (Math.random() - 0.5) * b.size[0],
-          0.1,
-          b.position[2] + (Math.random() - 0.5) * b.size[2]
-        ]
-        const id = state.people.length ? Math.max(...state.people.map(p => p.id)) + 1 : 0
-        state.people.push({ 
-            id, 
-            position: pos, 
-            targetBuildingId: b.id, 
-            speed: 0.8 + Math.random() * 0.6, 
-            name: randomName(Math.random),
-            role: 'visitor',
-            traits: { introversion: Math.random(), punctuality: Math.random(), energy: 1 },
-            schedule: [{ time: 9, activity: 'leisure' }, { time: 22, activity: 'sleep', targetId: 'res-family' }],
-            state: { currentActivity: 'idle', mood: 'neutral', history: [] }
-        })
+    // Ignore long suspended-tab gaps, then apply the same speed to every subsystem.
+    const elapsed = Math.min(dt, 1) * Math.max(0, Math.min(5, state.settings.speed))
+    if (!elapsed) return state
+    const environment = normalizeEnvironment(state.environment, {
+      gameTime: state.environment.gameTime + elapsed * SIM_HOURS_PER_SECOND,
+    })
+    if ((environment.scenarioRemaining ?? 0) > 0) {
+      environment.scenarioRemaining = Math.max(0, environment.scenarioRemaining! - elapsed)
+      if (!environment.scenarioRemaining) {
+        environment.activeScenario = undefined
+        environment.populationFactor = 1
       }
-    } else if (state.people.length > targetPop) {
-      const toRemove = Math.min(state.people.length - targetPop, Math.ceil(20 * dt))
-      state.people.splice(0, toRemove)
     }
 
-    // Process timed effects
-    if (state.effects.length) {
-      const remaining: typeof state.effects = []
-      for (const eff of state.effects) {
-        const newRem = eff.remaining - dt
-        if (newRem <= 0) {
-          if (eff.type === 'activityRevert') {
-            const b = state.buildings.find(x => x.id === eff.buildingId)
-            if (b) b.activity = Math.max(0, Math.min(1, b.activity - eff.delta))
-          } else if (eff.type === 'pause') {
-            state.settings.running = true
-          }
-        } else {
-          remaining.push({ ...eff, remaining: newRem })
+    const buildings = state.buildings.map(building => ({ ...building }))
+    const buildingById = new Map(buildings.map(building => [building.id, building]))
+    const departments = state.departments.map(department => ({ ...department, collaborations: { ...department.collaborations }, rivalries: { ...department.rivalries } }))
+    const deptInteractions = state.deptInteractions.map(interaction => ({ ...interaction, remaining: interaction.remaining - elapsed })).filter(interaction => interaction.remaining > 0)
+    const deptFlashes = state.deptFlashes.map(flash => ({ ...flash, remaining: flash.remaining - elapsed })).filter(flash => flash.remaining > 0)
+    const news = [...state.news]
+    processDepartmentDynamics(elapsed, departments, buildings, state.scenario, deptFlashes, deptInteractions, news)
+    const effects = state.effects.map(effect => ({ ...effect, remaining: effect.remaining - elapsed })).filter(effect => effect.remaining > 0)
+    const activityBoosts = new Map<string, number>()
+    for (const effect of effects) {
+      if (effect.type === 'activityRevert') activityBoosts.set(effect.buildingId, (activityBoosts.get(effect.buildingId) ?? 0) + effect.delta)
+    }
+    for (const building of buildings) {
+      const target = Math.max(0, Math.min(1, computeEnvActivityTarget(building, environment) + (activityBoosts.get(building.id) ?? 0)))
+      building.activity += (target - building.activity) * (1 - Math.exp(-elapsed * 0.3))
+    }
+
+    let people = state.people.map(person => ({ ...person, traits: { ...person.traits }, state: { ...person.state, history: [...person.state.history] } }))
+    const customCount = people.reduce((count, person) => count + Number(Boolean(person.isCustom)), 0)
+    const targetPopulation = computeTargetPopulation(environment) + customCount
+    const populationBudget = (state.populationAcc ?? 0) + 8 * elapsed
+    const populationStep = Math.floor(populationBudget)
+    const populationAcc = populationBudget - populationStep
+    if (buildings.length && people.length < targetPopulation && populationStep > 0) {
+      let nextId = people.reduce((largest, person) => Math.max(largest, person.id), -1) + 1
+      const toAdd = Math.min(populationStep, targetPopulation - people.length)
+      for (let index = 0; index < toAdd; index++) people.push(spawnDynamicVisitor(nextId++, buildings))
+    } else if (people.length > targetPopulation && populationStep > 0) {
+      people = removePeopleForTargetPopulation(people, Math.min(populationStep, people.length - targetPopulation), state.selectedPersonId)
+    }
+
+    // Spatial buckets keep local encounters proportional to population size.
+    const socialBuckets = new Map<string, number[]>()
+    for (let index = 0; index < people.length; index++) {
+      const person = people[index]
+      if (person.presence !== 'inside' || !['idle', 'leisure'].includes(person.state.currentActivity)) continue
+      const key = `${person.currentBuildingId}:${Math.floor(person.position[0] / 2)}:${Math.floor(person.position[2] / 2)}`
+      const bucket = socialBuckets.get(key) ?? []
+      bucket.push(index)
+      socialBuckets.set(key, bucket)
+    }
+    for (let index = 0; index < people.length; index++) {
+      let person = people[index]
+      if (person.state.currentActivity === 'talking') {
+        if (Math.random() < eventProbability(0.18, elapsed)) {
+          person.state = { ...person.state, currentActivity: 'leisure', talkingWith: undefined, mood: 'happy' }
         }
-      }
-      state.effects = remaining
-    }
-
-    if (!state.settings.running) return {}
-    const speed = state.settings.speed
-    let buildings = state.buildings.map(b => ({ ...b }))
-    const nextPeople = [...state.people]
-
-    // Move people towards target buildings
-    for (const p of nextPeople) {
-      let target = buildings.find(b => b.id === p.targetBuildingId)
-      
-      // Safety check: if target building is missing (e.g. deleted), assign a new one
-      if (!target) {
-        target = buildings[Math.floor(Math.random() * buildings.length)]
-        p.targetBuildingId = target.id
-      }
-
-      const dx = target.position[0] - p.position[0]
-      const dz = target.position[2] - p.position[2]
-      const dist = Math.hypot(dx, dz)
-      const step = Math.min(dist, dt * p.speed * speed)
-      if (dist > 0.01) {
-        p.position[0] += (dx / dist) * step
-        p.position[2] += (dz / dist) * step
       } else {
-        if (Math.random() < 0.01 + target.activity * 0.05) {
-          const others = buildings.filter(b => b.id !== target.id)
-          if (others.length > 0) {
-            p.targetBuildingId = others[Math.floor(Math.random() * others.length)].id
+        const decision = updateAgentBehavior(person, environment.gameTime, buildings, environment, elapsed)
+        if (decision.targetId && decision.targetId !== person.targetBuildingId) person = { ...person, targetBuildingId: decision.targetId, route: [], routeIndex: 0 }
+        if (decision.mood) person.state.mood = decision.mood
+        if (person.presence === 'inside' && person.targetBuildingId === person.currentBuildingId && person.state.currentActivity === 'leisure' && Math.random() < eventProbability(0.035, elapsed)) {
+          const key = `${person.currentBuildingId}:${Math.floor(person.position[0] / 2)}:${Math.floor(person.position[2] / 2)}`
+          const peers = socialBuckets.get(key) ?? []
+          const peerIndex = peers.slice(0, 12).find(candidate => candidate !== index && people[candidate].state.currentActivity === 'leisure')
+          if (peerIndex !== undefined) {
+            person.state = { ...person.state, currentActivity: 'talking', talkingWith: people[peerIndex].id, mood: 'happy' }
+            people[peerIndex].state = { ...people[peerIndex].state, currentActivity: 'talking', talkingWith: person.id, mood: 'happy' }
           }
         }
       }
+      if (!buildingById.has(person.targetBuildingId) && buildings.length) person = { ...person, targetBuildingId: buildings[0].id, route: [], routeIndex: 0 }
+      if (person.targetBuildingId !== person.currentBuildingId || (person.route?.length ?? 0) > 0) {
+        person = ensurePersonRoute(person, buildings)
+        const weatherSpeed = environment.condition === 'snow' ? 0.68 : environment.condition === 'rain' ? 0.88 : 1
+        person = updatePersonTravel(person, buildings, elapsed, weatherSpeed)
+        if (person.presence === 'inside' && person.state.currentActivity === 'commuting') {
+          const destination = buildingById.get(person.currentBuildingId!)
+          person.state.currentActivity = destination?.type === 'office' ? 'work' : destination?.zone === 'campus' ? 'study' : 'leisure'
+        }
+      }
+      people[index] = reconcilePersonBuilding(person, buildings)
     }
-
-    // Recompute occupancy
-    for (const b of buildings) b.occupancy = 0
-    for (const p of nextPeople) {
-      const nearest = buildings.reduce((a, b) => {
-        const da = Math.hypot(a.position[0] - p.position[0], a.position[2] - p.position[2])
-        const db = Math.hypot(b.position[0] - p.position[0], b.position[2] - p.position[2])
-        return da < db ? a : b
-      })
-      nearest.occupancy += 1
-    }
-
-    const activeBuildings = buildings.filter(b => b.activity > 0.3).length
-    const totalOccupancy = buildings.reduce((s, b) => s + b.occupancy, 0)
-    const totalPublications = state.departments.reduce((s, d) => s + d.publications, 0)
-    const activeCollaborations = state.deptInteractions.filter(e => e.type === 'collab').length
-    const activeRivalries = state.deptInteractions.filter(e => e.type === 'rivalry').length
-
-    // Update time series
-    state.tsAcc = (state.tsAcc ?? 0) + dt
-    if (state.tsAcc >= 1) {
-      state.tsAcc = 0
-      const sample = { 
-        ts: Date.now(), 
-        ai: state.scenario.investmentAI, 
-        hum: state.scenario.investmentHumanities, 
-        pubs: totalPublications, 
-        collabs: activeCollaborations, 
-        rivalries: activeRivalries, 
-        occupancy: totalOccupancy, 
-        activeBuildings 
-      } as TimeSample
-      state.timeseries = ([...(state.timeseries ?? []), sample]).slice(-180)
-    }
-
-    return { 
-      buildings: [...buildings], 
-      metrics: { 
-        totalPeople: state.people.length, 
-        activeBuildings, 
-        totalOccupancy, 
-        totalPublications, 
-        activeCollaborations, 
-        activeRivalries 
-      }, 
-      timeseries: state.timeseries, 
-      tsAcc: state.tsAcc 
-    }
+    const nextBuildings = withOccupancy(buildings, people)
+    const metrics = computeMetrics(nextBuildings, people, { departments, deptInteractions })
+    const sampleAcc = (state.tsAcc ?? 0) + elapsed
+    const tsAcc = sampleAcc % 1
+    const timeseries = sampleAcc >= 1 ? [...(state.timeseries ?? []), {
+      ts: Date.now(), ai: state.scenario.investmentAI, hum: state.scenario.investmentHumanities,
+      pubs: metrics.totalPublications ?? 0, collabs: metrics.activeCollaborations ?? 0,
+      rivalries: metrics.activeRivalries ?? 0, occupancy: metrics.totalOccupancy, activeBuildings: metrics.activeBuildings,
+    }].slice(-180) : state.timeseries
+    return { buildings: nextBuildings, people, environment, departments, deptInteractions, deptFlashes, news, effects, metrics, timeseries, tsAcc, populationAcc }
   }),
+  reset: () => {
+    const resetBuildings = initialBuildings.map(normalizeBuilding)
+    const resetPeople = initPeople(500, resetBuildings).map(person => normalizePerson(person, resetBuildings))
+    return set({
+      buildings: withOccupancy(resetBuildings, resetPeople),
+      people: resetPeople,
+      metrics: computeMetrics(withOccupancy(resetBuildings, resetPeople), resetPeople, { departments: get().departments, deptInteractions: get().deptInteractions }),
+    })
+  },
 
-  reset: () => set({ buildings: initialBuildings.map(b => ({ ...b })), people: initPeople(200, initialBuildings) }),
   resetRandom: () => set(state => {
-    const bs = state.buildings.map(b => ({ ...b, activity: 0.2 + Math.random() * 0.6, occupancy: 0 }))
-    return { buildings: bs, people: initPeople(state.people.length, bs) }
+    const randomizedBuildings = state.buildings.map(building => normalizeBuilding({ ...building, activity: 0.2 + Math.random() * 0.6, occupancy: 0 }))
+    const randomizedPeople = initPeople(state.people.length, randomizedBuildings).map(person => normalizePerson(person, randomizedBuildings))
+    return {
+      buildings: withOccupancy(randomizedBuildings, randomizedPeople),
+      people: randomizedPeople,
+      metrics: computeMetrics(withOccupancy(randomizedBuildings, randomizedPeople), randomizedPeople, state),
+    }
   }),
-  setSelectedPerson: (id) => set({ selectedPersonId: id })
-  ,
+
+  setSelectedPerson: (id) => set({ selectedPersonId: id }),
   setHoveredBuilding: (id) => set({ hoveredBuildingId: id }),
   setSelectedBuilding: (id) => set({ selectedBuildingId: id }),
-  setScenario: (s) => set(state => ({ scenario: { ...state.scenario, ...s } })),
-  applyAgentActions: (acts) => set(state => {
-    const newNews = [...state.news]
-    applyAgentActionsLogic(
-      acts,
-      state.agents,
-      state.departments,
-      state.buildings,
-      state.deptFlashes,
-      state.deptInteractions,
-      newNews,
-      state.scenario,
-      state.people
-    )
-    return { news: newNews.slice(-50) }
+  setScenario: (scenario) => set(state => ({ scenario: { ...state.scenario, ...scenario } })),
+
+  applyAgentActions: (actions) => set(state => {
+    const news = [...state.news]
+    const agents = state.agents.map(agent => ({ ...agent, memory: [...(agent.memory ?? [])] }))
+    const departments = state.departments.map(department => ({ ...department, collaborations: { ...department.collaborations }, rivalries: { ...department.rivalries } }))
+    const buildings = state.buildings.map(building => ({ ...building }))
+    const deptFlashes = [...state.deptFlashes]
+    const deptInteractions = [...state.deptInteractions]
+    const scenario = { ...state.scenario }
+    const people = state.people.map(person => ({ ...person, state: { ...person.state } }))
+    applyAgentActionsLogic(actions, agents, departments, buildings, deptFlashes, deptInteractions, news, scenario, people)
+    for (let index = 0; index < people.length; index++) {
+      if (people[index].targetBuildingId !== state.people[index].targetBuildingId) {
+        people[index] = { ...people[index], route: [], routeIndex: 0, state: { ...people[index].state, currentActivity: 'commuting', commandRemaining: 120 } }
+      }
+    }
+    return { agents, departments, buildings, deptFlashes, deptInteractions, scenario, people, news: news.slice(-50), metrics: computeMetrics(buildings, people, { departments, deptInteractions }) }
   }),
 
   fetchRealWeather: async () => {
     const { fetchWeather } = await import('../lib/weather')
-    const w = await fetchWeather()
+    const weather = await fetchWeather()
 
-    // Infer season/period from date/weather
-    const now = new Date()
-    const month = now.getMonth() // 0-11
-    const hour = now.getHours()
-    const day = now.getDay()
-
-    let season: Environment['season'] = 'ete'
-    if (month >= 11 || month <= 2) season = 'hiver'
-    else if (month >= 3 && month <= 5) season = 'printemps'
-    else if (month >= 9 && month <= 10) season = 'automne'
-
-    let dayPeriod: Environment['dayPeriod'] = 'midi'
-    if (hour >= 5 && hour < 11) dayPeriod = 'matin'
-    else if (hour >= 11 && hour < 14) dayPeriod = 'midi'
-    else if (hour >= 14 && hour < 18) dayPeriod = 'apresmidi'
-    else if (hour >= 18 && hour < 22) dayPeriod = 'soir'
-    else dayPeriod = 'nuit'
-
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Toronto', month: 'numeric', weekday: 'short', hour: 'numeric', minute: 'numeric', hourCycle: 'h23',
+    }).formatToParts(new Date())
+    const value = (type: string) => parts.find(part => part.type === type)?.value ?? ''
+    const month = Number(value('month'))
+    const gameTime = Number(value('hour')) + Number(value('minute')) / 60
+    const season: Environment['season'] = month >= 3 && month <= 5 ? 'printemps' : month >= 6 && month <= 8 ? 'ete' : month >= 9 && month <= 11 ? 'automne' : 'hiver'
     set(state => ({
-      environment: {
-        ...state.environment,
+      environment: normalizeEnvironment(state.environment, {
         realTime: true,
-        temperature: w.temperature,
-        condition: w.condition,
+        temperature: weather.temperature,
+        condition: weather.condition,
         season,
-        dayPeriod,
-        weekend: day === 0 || day === 6
-      }
+        gameTime,
+        weekend: value('weekday') === 'Sat' || value('weekday') === 'Sun',
+        activeScenario: undefined,
+        scenarioRemaining: 0,
+        populationFactor: 1,
+      }),
     }))
-  }
+  },
 }))
